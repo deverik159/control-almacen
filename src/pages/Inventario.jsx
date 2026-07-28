@@ -10,6 +10,7 @@ export default function Inventario() {
   const [items, setItems] = useState([])
   const [areas, setAreas] = useState([])
   const [areaSel, setAreaSel] = useState('')
+  const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
   const [subiendo, setSubiendo] = useState(null)   // id_inventario en proceso
@@ -27,8 +28,10 @@ export default function Inventario() {
   useEffect(() => { cargar() }, [])
 
   const nombreArea = (id) => areas.find(a => a.id_area === id)?.nombre_area
+  const areasInactivas = new Set(areas.filter(a => a.activo === false).map(a => a.id_area))
 
   const filtrados = items
+    .filter(i => mostrarInactivas || !areasInactivas.has(i.id_area))
     .filter(i => !areaSel || i.id_area === areaSel)
     .filter(i =>
       (i.nombre + i.id_item).toLowerCase().includes(busqueda.toLowerCase())
@@ -81,7 +84,9 @@ export default function Inventario() {
           <select value={areaSel} onChange={e => setAreaSel(e.target.value)}
             className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-56">
             <option value="">Todas las áreas</option>
-            {areas.map(a => <option key={a.id_area} value={a.id_area}>{a.id_area} · {a.nombre_area}</option>)}
+            {areas
+              .filter(a => mostrarInactivas || a.activo !== false)
+              .map(a => <option key={a.id_area} value={a.id_area}>{a.id_area} · {a.nombre_area}{a.activo === false ? ' (inactiva)' : ''}</option>)}
           </select>
           <input
             placeholder="Buscar por nombre o código…"
@@ -90,6 +95,14 @@ export default function Inventario() {
           />
         </div>
       </div>
+
+      {areasInactivas.size > 0 && (
+        <label className="flex items-center gap-2 text-xs text-acero-600 mb-4 cursor-pointer">
+          <input type="checkbox" checked={mostrarInactivas}
+            onChange={e => { setMostrarInactivas(e.target.checked); if (!e.target.checked && areasInactivas.has(areaSel)) setAreaSel('') }} />
+          Mostrar artículos de áreas inactivas ({items.filter(i => areasInactivas.has(i.id_area)).length})
+        </label>
+      )}
 
       {cargando && <p className="text-acero-600 text-sm font-mono">Cargando inventario…</p>}
       {!cargando && filtrados.length === 0 && (
