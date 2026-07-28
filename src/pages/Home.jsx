@@ -16,6 +16,7 @@ export default function Home() {
   const [serie, setSerie] = useState([])       // movimientos por día
   const [alertas, setAlertas] = useState([])   // distribución del semáforo
   const [topSalidas, setTopSalidas] = useState([])
+  const [muertos, setMuertos] = useState([])
 
   useEffect(() => {
     const desde = new Date()
@@ -24,12 +25,17 @@ export default function Home() {
 
     Promise.all([
       supabase.from('vw_stock').select('id_item, nombre, stock_calculado, stock_minimo, alerta_stock'),
+      supabase.from('vw_stock')
+        .select('id_item, nombre, stock_calculado, dias_sin_movimiento')
+        .gt('stock_calculado', 0).gte('dias_sin_movimiento', 90)
+        .order('dias_sin_movimiento', { ascending: false }).limit(8),
       supabase.from('vw_pos').select('id_po, po, articulo, pendiente')
         .eq('estatus', 'Parcial').gt('pendiente', 0).limit(8),
       supabase.from('entradas').select('fecha_entrada, cantidad_recepcion').gte('fecha_entrada', desdeISO),
       supabase.from('salidas').select('fecha_salida, cantidad, id_item').gte('fecha_salida', desdeISO),
       supabase.from('devoluciones').select('fecha_devolucion, cantidad').gte('fecha_devolucion', desdeISO),
-    ]).then(([stock, pos, ent, sal, dev]) => {
+    ]).then(([stock, mtos, pos, ent, sal, dev]) => {
+      setMuertos(mtos.data ?? [])
       const s = stock.data ?? []
       setBajos(s.filter(i => i.alerta_stock === '🔴 Stock Bajo').slice(0, 8))
       setPendientes(pos.data ?? [])
@@ -149,6 +155,24 @@ export default function Home() {
                   <li key={i.id_item} className="px-4 py-2.5 flex justify-between text-sm gap-2">
                     <span className="truncate">{i.nombre}</span>
                     <span className="font-mono whitespace-nowrap">{i.stock_calculado} / mín {i.stock_minimo}</span>
+                  </li>
+                ))}
+              </ul>}
+        </section>
+
+        {/* Inventario muerto */}
+        <section className="bg-white rounded-lg border border-acero-200">
+          <header className="px-4 py-3 border-b border-acero-100 flex justify-between items-center">
+            <h2 className="font-semibold text-sm">🕸 Inventario muerto (90+ días)</h2>
+            <Link to="/inventario" className="text-xs underline text-acero-600">Inventario</Link>
+          </header>
+          {muertos.length === 0
+            ? <p className="p-4 text-sm text-acero-600">Sin artículos estancados. Todo se mueve. 💪</p>
+            : <ul className="divide-y divide-acero-100">
+                {muertos.map(i => (
+                  <li key={i.id_item} className="px-4 py-2.5 flex justify-between text-sm gap-2">
+                    <span className="truncate">{i.nombre}</span>
+                    <span className="font-mono whitespace-nowrap text-red-700">{i.dias_sin_movimiento} d · stock {i.stock_calculado}</span>
                   </li>
                 ))}
               </ul>}

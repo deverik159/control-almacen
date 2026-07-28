@@ -11,6 +11,7 @@ export default function Inventario() {
   const [areas, setAreas] = useState([])
   const [areaSel, setAreaSel] = useState('')
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
+  const [diasSel, setDiasSel] = useState(0)
   const [busqueda, setBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
   const [subiendo, setSubiendo] = useState(null)   // id_inventario en proceso
@@ -33,9 +34,13 @@ export default function Inventario() {
   const filtrados = items
     .filter(i => mostrarInactivas || !areasInactivas.has(i.id_area))
     .filter(i => !areaSel || i.id_area === areaSel)
+    .filter(i => !diasSel || (i.dias_sin_movimiento >= diasSel && i.stock_calculado > 0))
     .filter(i =>
       (i.nombre + i.id_item).toLowerCase().includes(busqueda.toLowerCase())
     )
+
+  const colorDias = (d) =>
+    d >= 90 ? 'text-red-700' : d >= 30 ? 'text-yellow-700' : 'text-acero-600'
 
   const pedirImagen = (item) => {
     itemImagen.current = item
@@ -81,6 +86,14 @@ export default function Inventario() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold">Inventario general</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <select value={diasSel} onChange={e => setDiasSel(Number(e.target.value))}
+            className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-52">
+            <option value={0}>Cualquier movimiento</option>
+            <option value={30}>🕸 Sin movimiento +30 días</option>
+            <option value={60}>🕸 Sin movimiento +60 días</option>
+            <option value={90}>🕸 Sin movimiento +90 días</option>
+            <option value={180}>🕸 Sin movimiento +180 días</option>
+          </select>
           <select value={areaSel} onChange={e => setAreaSel(e.target.value)}
             className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-56">
             <option value="">Todas las áreas</option>
@@ -153,6 +166,11 @@ export default function Inventario() {
                   <div className="text-right text-xs text-acero-600 font-mono">
                     <div>+{i.total_entradas} ent.</div>
                     <div>−{i.total_salidas} sal.</div>
+                    {i.dias_sin_movimiento != null && (
+                      <div className={colorDias(i.dias_sin_movimiento)}>
+                        {i.dias_sin_movimiento === 0 ? 'movido hoy' : `${i.dias_sin_movimiento} d sin mov.`}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
