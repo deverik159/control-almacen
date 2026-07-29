@@ -21,12 +21,12 @@ export default function Layout() {
     <div className="min-h-screen flex flex-col md:flex-row">
       <Notificaciones />
       {/* Barra lateral */}
-      <aside className="md:w-56 bg-acero-950 text-acero-200 flex md:flex-col shrink-0">
+      <aside className="md:w-56 bg-acero-950 text-acero-200 flex md:flex-col shrink-0 md:sticky md:top-0 md:h-screen">
         <div className="hidden md:block px-5 py-6 border-b border-acero-800">
           <div className="font-mono text-ambar-400 text-xs tracking-widest">ALMACÉN</div>
           <div className="font-semibold text-white text-lg leading-tight">Control de<br/>Inventario</div>
         </div>
-        <nav className="flex md:flex-col flex-1 overflow-x-auto md:overflow-visible md:py-3">
+        <nav className="flex md:flex-col flex-1 overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:py-3">
           {nav
             .filter(i => !i.roles || i.roles.includes(perfil?.rol))
             .map(i => (
