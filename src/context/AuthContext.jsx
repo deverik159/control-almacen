@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
     if (!session) return
     supabase
       .from('usuarios')
-      .select('nombre, rol, area, email, push_notify')
+      .select('nombre, rol, area, email, push_notify, areas_permitidas')
       .eq('id', session.user.id)
       .single()
       .then(({ data }) => {
