@@ -37,16 +37,21 @@ export default function Home() {
     ]).then(([stock, mtos, pos, ent, sal, dev]) => {
       setMuertos(mtos.data ?? [])
       const s = stock.data ?? []
-      setBajos(s.filter(i => i.alerta_stock === '🔴 Stock Bajo').slice(0, 8))
+      setBajos(
+        s.filter(i => ['⚫ Sin Stock', '🔴 Stock Bajo'].includes(i.alerta_stock))
+          .sort((a, b) => a.stock_calculado - b.stock_calculado)
+          .slice(0, 8)
+      )
       setPendientes(pos.data ?? [])
 
       // Distribución del semáforo
-      const conteo = { '🔴 Stock Bajo': 0, '🟡 Stock Medio': 0, '🟢 Stock OK': 0 }
+      const conteo = { '⚫ Sin Stock': 0, '🔴 Stock Bajo': 0, '🟡 Stock Medio': 0, '🟢 Stock OK': 0 }
       s.forEach(i => { conteo[i.alerta_stock] = (conteo[i.alerta_stock] ?? 0) + 1 })
       setAlertas([
-        { name: 'Bajo',  value: conteo['🔴 Stock Bajo'],  color: '#dc2626' },
-        { name: 'Medio', value: conteo['🟡 Stock Medio'], color: '#f5b301' },
-        { name: 'OK',    value: conteo['🟢 Stock OK'],    color: '#16a34a' },
+        { name: 'Sin stock', value: conteo['⚫ Sin Stock'],  color: '#161b21' },
+        { name: 'Bajo',      value: conteo['🔴 Stock Bajo'],  color: '#dc2626' },
+        { name: 'Medio',     value: conteo['🟡 Stock Medio'], color: '#f5b301' },
+        { name: 'OK',        value: conteo['🟢 Stock OK'],    color: '#16a34a' },
       ].filter(x => x.value > 0))
 
       // Serie diaria: entradas (+devoluciones) vs salidas
@@ -145,7 +150,7 @@ export default function Home() {
         {/* Stock bajo */}
         <section className="bg-white rounded-lg border border-acero-200">
           <header className="px-4 py-3 border-b border-acero-100 flex justify-between items-center">
-            <h2 className="font-semibold text-sm">🔴 Stock bajo</h2>
+            <h2 className="font-semibold text-sm">🔴 Stock bajo / ⚫ sin stock</h2>
             <Link to="/inventario" className="text-xs underline text-acero-600">Inventario</Link>
           </header>
           {bajos.length === 0
