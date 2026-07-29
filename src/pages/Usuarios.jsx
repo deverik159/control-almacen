@@ -7,11 +7,14 @@ const ROLES = ['Admin', 'Almacenista', 'Consulta']
 export default function Usuarios() {
   const { session } = useAuth()
   const [lista, setLista] = useState([])
+  const [areas, setAreas] = useState([])
   const [msg, setMsg] = useState('')
 
   const cargar = () =>
-    supabase.from('usuarios').select('*').order('nombre')
-      .then(({ data }) => setLista(data ?? []))
+    Promise.all([
+      supabase.from('usuarios').select('*').order('nombre'),
+      supabase.from('areas').select('*').eq('activo', true).order('id_area'),
+    ]).then(([u, a]) => { setLista(u.data ?? []); setAreas(a.data ?? []) })
   useEffect(() => { cargar() }, [])
 
   const actualizar = async (id, cambios) => {
@@ -40,7 +43,7 @@ export default function Usuarios() {
             <tr>
               <th className="text-left px-4 py-2.5">Nombre</th>
               <th className="text-left px-4 py-2.5">Correo</th>
-              <th className="text-left px-4 py-2.5">Área</th>
+              <th className="text-left px-4 py-2.5">Áreas visibles (Consulta)</th>
               <th className="text-left px-4 py-2.5">Rol</th>
               <th className="text-center px-4 py-2.5">Notificaciones</th>
             </tr>
@@ -51,9 +54,12 @@ export default function Usuarios() {
                 <td className="px-4 py-2.5">{u.nombre}{u.id === session.user.id && <span className="text-xs text-acero-600"> (tú)</span>}</td>
                 <td className="px-4 py-2.5 text-xs">{u.email}</td>
                 <td className="px-4 py-2.5">
-                  <input defaultValue={u.area ?? ''} placeholder="—"
-                    onBlur={e => e.target.value !== (u.area ?? '') && actualizar(u.id, { area: e.target.value || null })}
-                    className="w-28 rounded border border-acero-200 px-2 py-1 text-sm" />
+                  <AreasPicker
+                    areas={areas}
+                    valor={u.areas_permitidas ?? []}
+                    deshabilitado={u.rol !== 'Consulta'}
+                    onChange={(nuevas) => actualizar(u.id, { areas_permitidas: nuevas.length ? nuevas : null })}
+                  />
                 </td>
                 <td className="px-4 py-2.5">
                   <select value={u.rol} onChange={e => actualizar(u.id, { rol: e.target.value })}
@@ -70,6 +76,45 @@ export default function Usuarios() {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+
+function AreasPicker({ areas, valor, deshabilitado, onChange }) {
+  const [abierto, setAbierto] = useState(false)
+
+  if (deshabilitado) return <span className="text-xs text-acero-600">Todas (por rol)</span>
+
+  const toggle = (id) => {
+    const set = new Set(valor)
+    set.has(id) ? set.delete(id) : set.add(id)
+    onChange([...set])
+  }
+
+  return (
+    <div className="relative">
+      <button onClick={() => setAbierto(a => !a)}
+        className="rounded border border-acero-200 px-2 py-1 text-xs hover:border-acero-600 max-w-40 truncate">
+        {valor.length === 0 ? 'Todas' : valor.length === 1 ? valor[0] : valor.length + ' áreas'} ▾
+      </button>
+      {abierto && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
+          <div className="absolute z-50 mt-1 bg-white border border-acero-200 rounded-lg shadow-xl p-2 w-64 max-h-64 overflow-y-auto">
+            <p className="text-[11px] text-acero-600 px-1 pb-1.5 border-b border-acero-100 mb-1">
+              Sin selección = ve todo el inventario
+            </p>
+            {areas.map(a => (
+              <label key={a.id_area} className="flex items-center gap-2 px-1 py-1 text-sm cursor-pointer hover:bg-acero-50 rounded">
+                <input type="checkbox" checked={valor.includes(a.id_area)}
+                  onChange={() => toggle(a.id_area)} />
+                <span className="font-mono text-xs">{a.id_area}</span> {a.nombre_area}
+              </label>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

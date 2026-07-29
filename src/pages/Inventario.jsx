@@ -12,6 +12,7 @@ export default function Inventario() {
   const [areaSel, setAreaSel] = useState('')
   const [mostrarInactivas, setMostrarInactivas] = useState(false)
   const [diasSel, setDiasSel] = useState(0)
+  const [estadoSel, setEstadoSel] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [cargando, setCargando] = useState(true)
   const [subiendo, setSubiendo] = useState(null)   // id_inventario en proceso
@@ -31,10 +32,16 @@ export default function Inventario() {
   const nombreArea = (id) => areas.find(a => a.id_area === id)?.nombre_area
   const areasInactivas = new Set(areas.filter(a => a.activo === false).map(a => a.id_area))
 
+  // Rol Consulta con áreas asignadas: solo ve esas áreas
+  const restringido = perfil?.rol === 'Consulta' && (perfil?.areas_permitidas?.length > 0)
+  const permitidas = new Set(perfil?.areas_permitidas ?? [])
+
   const filtrados = items
+    .filter(i => !restringido || permitidas.has(i.id_area))
     .filter(i => mostrarInactivas || !areasInactivas.has(i.id_area))
     .filter(i => !areaSel || i.id_area === areaSel)
     .filter(i => !diasSel || (i.dias_sin_movimiento >= diasSel && i.stock_calculado > 0))
+    .filter(i => !estadoSel || i.alerta_stock === estadoSel)
     .filter(i =>
       (i.nombre + i.id_item).toLowerCase().includes(busqueda.toLowerCase())
     )
@@ -86,6 +93,14 @@ export default function Inventario() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold">Inventario general</h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <select value={estadoSel} onChange={e => setEstadoSel(e.target.value)}
+            className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-44">
+            <option value="">Todos los estados</option>
+            <option value="⚫ Sin Stock">⚫ Sin Stock</option>
+            <option value="🔴 Stock Bajo">🔴 Stock Bajo</option>
+            <option value="🟡 Stock Medio">🟡 Stock Medio</option>
+            <option value="🟢 Stock OK">🟢 Stock OK</option>
+          </select>
           <select value={diasSel} onChange={e => setDiasSel(Number(e.target.value))}
             className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-52">
             <option value={0}>Cualquier movimiento</option>
@@ -98,6 +113,7 @@ export default function Inventario() {
             className="rounded border border-acero-200 bg-white px-3 py-2 text-sm sm:w-56">
             <option value="">Todas las áreas</option>
             {areas
+              .filter(a => !restringido || permitidas.has(a.id_area))
               .filter(a => mostrarInactivas || a.activo !== false)
               .map(a => <option key={a.id_area} value={a.id_area}>{a.id_area} · {a.nombre_area}{a.activo === false ? ' (inactiva)' : ''}</option>)}
           </select>
@@ -108,6 +124,12 @@ export default function Inventario() {
           />
         </div>
       </div>
+
+      {restringido && (
+        <p className="text-xs text-acero-600 mb-3 bg-acero-50 border border-acero-200 rounded px-3 py-2 inline-block">
+          👁 Vista limitada a tus áreas: {[...permitidas].map(a => nombreArea(a) ?? a).join(', ')}
+        </p>
+      )}
 
       {areasInactivas.size > 0 && (
         <label className="flex items-center gap-2 text-xs text-acero-600 mb-4 cursor-pointer">
