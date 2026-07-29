@@ -9,6 +9,7 @@ import Recepciones from './pages/Recepciones'
 import Salidas from './pages/Salidas'
 import Devoluciones from './pages/Devoluciones'
 import Bitacora from './pages/Bitacora'
+import Solicitudes from './pages/Solicitudes'
 import Importar from './pages/Importar'
 import Catalogos from './pages/Catalogos'
 import Usuarios from './pages/Usuarios'
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/recepciones" element={<Recepciones />} />
             <Route path="/salidas" element={<Salidas />} />
             <Route path="/devoluciones" element={<Devoluciones />} />
+            <Route path="/solicitudes" element={<Solicitudes />} />
             <Route path="/bitacora" element={<Bitacora />} />
             <Route path="/catalogos" element={
               <ProtectedRoute roles={['Admin']}><Catalogos /></ProtectedRoute>
