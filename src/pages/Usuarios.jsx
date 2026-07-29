@@ -83,6 +83,7 @@ export default function Usuarios() {
 
 function AreasPicker({ areas, valor, deshabilitado, onChange }) {
   const [abierto, setAbierto] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
 
   if (deshabilitado) return <span className="text-xs text-acero-600">Todas (por rol)</span>
 
@@ -92,16 +93,27 @@ function AreasPicker({ areas, valor, deshabilitado, onChange }) {
     onChange([...set])
   }
 
+  const abrir = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    // Panel de 16rem (256px); si no cabe a la derecha, se alinea hacia la izquierda
+    const left = Math.min(r.left, window.innerWidth - 272)
+    // Si no cabe abajo, se abre hacia arriba
+    const top = r.bottom + 264 > window.innerHeight ? Math.max(8, r.top - 268) : r.bottom + 4
+    setPos({ top, left })
+    setAbierto(a => !a)
+  }
+
   return (
-    <div className="relative">
-      <button onClick={() => setAbierto(a => !a)}
+    <>
+      <button onClick={abrir}
         className="rounded border border-acero-200 px-2 py-1 text-xs hover:border-acero-600 max-w-40 truncate">
         {valor.length === 0 ? 'Todas' : valor.length === 1 ? valor[0] : valor.length + ' áreas'} ▾
       </button>
       {abierto && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setAbierto(false)} />
-          <div className="absolute z-50 mt-1 bg-white border border-acero-200 rounded-lg shadow-xl p-2 w-64 max-h-64 overflow-y-auto">
+          <div style={{ position: 'fixed', top: pos.top, left: pos.left }}
+            className="z-50 bg-white border border-acero-200 rounded-lg shadow-xl p-2 w-64 max-h-64 overflow-y-auto">
             <p className="text-[11px] text-acero-600 px-1 pb-1.5 border-b border-acero-100 mb-1">
               Sin selección = ve todo el inventario
             </p>
@@ -115,6 +127,6 @@ function AreasPicker({ areas, valor, deshabilitado, onChange }) {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }
