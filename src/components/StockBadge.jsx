@@ -1,5 +1,6 @@
 // Semáforo de stock — el mismo lenguaje visual de la app de AppSheet
 const estilos = {
+  '⚫ Sin Stock':   'bg-acero-950 text-white border-acero-950',
   '🔴 Stock Bajo':  'bg-red-100 text-red-800 border-red-300',
   '🟡 Stock Medio': 'bg-ambar-400/20 text-yellow-800 border-ambar-500/50',
   '🟢 Stock OK':    'bg-green-100 text-green-800 border-green-300',
