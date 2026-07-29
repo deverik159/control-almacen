@@ -8,6 +8,7 @@ const nav = [
   { to: '/recepciones',  label: 'Recepciones',   roles: null },
   { to: '/salidas',      label: 'Salidas',       roles: null },
   { to: '/devoluciones', label: 'Devoluciones',  roles: null },
+  { to: '/solicitudes',  label: 'Solicitudes',   roles: null },
   { to: '/bitacora',     label: 'Bitácora',      roles: null },
   { to: '/catalogos',    label: 'Catálogos',     roles: ['Admin'] },
   { to: '/importar',     label: 'Importar',      roles: ['Admin'] },
