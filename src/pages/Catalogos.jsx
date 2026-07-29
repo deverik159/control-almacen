@@ -10,18 +10,22 @@ export default function Catalogos() {
   const [areas, setAreas] = useState([])
   const [proveedores, setProveedores] = useState([])
   const [requisitores, setRequisitores] = useState([])
+  const [unidades, setUnidades] = useState([])
+  const [formUM, setFormUM] = useState({ nombre: '' })
   const [msg, setMsg] = useState('')
   const [formProv, setFormProv] = useState({ nombre: '', rfc: '', contacto: '', telefono: '', email: '' })
   const [formReq, setFormReq] = useState({ nombre: '', id_area: '', email: '' })
   const [formArea, setFormArea] = useState({ id_area: '', nombre_area: '' })
 
   const cargar = async () => {
-    const [a, p, r] = await Promise.all([
+    const [a, p, r, u] = await Promise.all([
       supabase.from('areas').select('*').order('id_area'),
       supabase.from('proveedores').select('*').order('nombre'),
       supabase.from('requisitores').select('*').order('nombre'),
+      supabase.from('unidades_medida').select('*').order('nombre'),
     ])
     setAreas(a.data ?? []); setProveedores(p.data ?? []); setRequisitores(r.data ?? [])
+    setUnidades(u.data ?? [])
   }
   useEffect(() => { cargar() }, [])
 
@@ -47,6 +51,15 @@ export default function Catalogos() {
     if (error) return setMsg(error.message.includes('duplicate')
       ? '⚠ Ese requisitor ya existe.' : '❌ ' + error.message)
     setMsg('✅ Requisitor dado de alta.'); setFormReq({ nombre: '', id_area: '', email: '' }); cargar()
+  }
+
+  const guardarUM = async () => {
+    setMsg('')
+    if (!formUM.nombre.trim()) return setMsg('⚠ Indica el nombre de la unidad.')
+    const { error } = await supabase.from('unidades_medida').insert({ nombre: formUM.nombre.trim() })
+    if (error) return setMsg(error.message.includes('duplicate')
+      ? '⚠ Esa unidad ya existe.' : '❌ ' + error.message)
+    setMsg('✅ Unidad agregada.'); setFormUM({ nombre: '' }); cargar()
   }
 
   const guardarArea = async () => {
@@ -120,7 +133,7 @@ export default function Catalogos() {
 
   const Tabs = () => (
     <div className="flex gap-2 mb-5 flex-wrap">
-      {[['proveedores', 'Proveedores'], ['requisitores', 'Requisitores'], ['areas', 'Áreas']].map(([k, t]) => (
+      {[['proveedores', 'Proveedores'], ['requisitores', 'Requisitores'], ['areas', 'Áreas'], ['unidades', 'Unidades']].map(([k, t]) => (
         <button key={k} onClick={() => { setTab(k); setMsg('') }}
           className={`px-4 py-1.5 rounded text-sm border ${tab === k
             ? 'bg-acero-950 text-white border-acero-950' : 'bg-white border-acero-200 hover:border-acero-600'}`}>
@@ -249,6 +262,31 @@ export default function Catalogos() {
             filas={areas}
             cols={[['id_area', 'ID'], ['nombre_area', 'Nombre']]}
             idCol="id_area" tabla="areas" onToggle={toggleActivo} />
+        </>
+      )}
+      {/* ---------- UNIDADES DE MEDIDA ---------- */}
+      {tab === 'unidades' && (
+        <>
+          <div className="bg-white rounded-lg border border-acero-200 p-5 mb-5 max-w-md">
+            <h2 className="font-semibold text-sm mb-3">Nueva unidad de medida</h2>
+            <div className="flex gap-3">
+              <input value={formUM.nombre} placeholder="Pieza, Tramo, Tarima…"
+                onChange={e => setFormUM({ nombre: e.target.value })}
+                onKeyDown={e => e.key === 'Enter' && guardarUM()}
+                className={inp} />
+              <button onClick={guardarUM}
+                className="rounded bg-ambar-500 text-acero-950 px-5 py-2 text-sm font-semibold hover:bg-ambar-400 whitespace-nowrap">
+                Agregar
+              </button>
+            </div>
+            <p className="text-[11px] text-acero-600 mt-2">
+              Las unidades inactivas dejan de sugerirse en los forms, pero los artículos que ya las usan no cambian.
+            </p>
+          </div>
+          <Lista
+            filas={unidades}
+            cols={[['nombre', 'Unidad']]}
+            idCol="nombre" tabla="unidades_medida" onToggle={toggleActivo} />
         </>
       )}
     </div>

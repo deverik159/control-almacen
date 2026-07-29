@@ -3,7 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { parseCSV, normalizarHeader, parseMonto, parseFechaDMA } from '../lib/csv'
 
-const CODIGOS_ESPECIALES = ['SIN_PO', 'AJUSTE', 'EXCEPCIONAL']
+const MOTIVOS_ESPECIALES = {
+  SIN_PO: 'Entrada legítima que no tiene orden de compra: compra directa, urgencia, caja chica.',
+  AJUSTE: 'Corrección de inventario: conteo físico, merma o diferencia encontrada.',
+  EXCEPCIONAL: 'Fuera de proceso: garantía repuesta por proveedor, donación, material regresado.',
+}
 
 const poVacia = {
   po: '', fecha_po: new Date().toISOString().slice(0, 10),
@@ -87,6 +91,7 @@ export default function Recepciones() {
   const [areas, setAreas] = useState([])
   const [proveedores, setProveedores] = useState([])
   const [requisitores, setRequisitores] = useState([])
+  const [unidades, setUnidades] = useState([])
   const [editar, setEditar] = useState(null)   // PO en edición (solo Admin)
   const [panel, setPanel] = useState(null)        // 'po' | 'especial' | 'importar' | null
   const [recibir, setRecibir] = useState(null)
@@ -105,18 +110,20 @@ export default function Recepciones() {
   const [importando, setImportando] = useState(false)
 
   const cargar = async () => {
-    const [p, m, a, pr, rq] = await Promise.all([
+    const [p, m, a, pr, rq, um] = await Promise.all([
       supabase.from('vw_pos').select('*').order('fecha_po', { ascending: false }).limit(500),
       supabase.from('materiales_herramientas').select('id_item, nombre, unidad_medida').order('nombre'),
       supabase.from('areas').select('*').eq('activo', true).order('id_area'),
       supabase.from('proveedores').select('nombre').eq('activo', true).order('nombre'),
       supabase.from('requisitores').select('nombre').eq('activo', true).order('nombre'),
+      supabase.from('unidades_medida').select('nombre').eq('activo', true).order('nombre'),
     ])
     setPos(p.data ?? [])
     setItems(m.data ?? [])
     setAreas(a.data ?? [])
     setProveedores(pr.data ?? [])
     setRequisitores(rq.data ?? [])
+    setUnidades(um.data ?? [])
   }
   useEffect(() => { cargar() }, [])
 
@@ -427,8 +434,7 @@ export default function Recepciones() {
         {requisitores.map(x => <option key={x.nombre} value={x.nombre} />)}
       </datalist>
       <datalist id="dl-um">
-        {['Pieza', 'Cubeta', 'Caja', 'Paquete', 'Rollo', 'Bolsa', 'Galón', 'Litro', 'Kg', 'Metro', 'Par', 'Juego'].map(u =>
-          <option key={u} value={u} />)}
+        {unidades.map(u => <option key={u.nombre} value={u.nombre} />)}
       </datalist>
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
@@ -559,16 +565,25 @@ export default function Recepciones() {
       {/* ---- Form Recepción sin PO ---- */}
       {panel === 'especial' && (
         <div className="bg-white rounded-lg border border-acero-200 p-5 mb-6 max-w-2xl">
-          <h2 className="font-semibold text-sm mb-4">Recepción especial (sin PO)</h2>
+          <h2 className="font-semibold text-sm mb-1">Recepción especial</h2>
+          <p className="text-xs text-acero-600 mb-4">Para entradas que no vienen de una orden de compra. Elige el motivo que la clasifica.</p>
           <div className="grid sm:grid-cols-2 gap-4">
             <SelectorArticulo f={formEsp} setF={setFormEsp} items={items} />
-            <div>
-              <label className={lbl}>Código especial</label>
-              <select value={formEsp.po_codigo}
-                onChange={e => setFormEsp(v => ({ ...v, po_codigo: e.target.value }))}
-                className={inp + ' bg-white font-mono'}>
-                {CODIGOS_ESPECIALES.map(c => <option key={c}>{c}</option>)}
-              </select>
+            <div className="sm:col-span-2">
+              <label className={lbl}>Motivo (queda registrado en la bitácora)</label>
+              <div className="flex gap-2 flex-wrap">
+                {Object.keys(MOTIVOS_ESPECIALES).map(c => (
+                  <button key={c} type="button"
+                    onClick={() => setFormEsp(v => ({ ...v, po_codigo: c }))}
+                    className={`px-3 py-1.5 rounded text-sm border font-mono ${formEsp.po_codigo === c
+                      ? 'bg-acero-950 text-white border-acero-950' : 'bg-white border-acero-200 hover:border-acero-600'}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-acero-600 mt-2 bg-acero-50 border border-acero-100 rounded px-3 py-2">
+                {MOTIVOS_ESPECIALES[formEsp.po_codigo]}
+              </p>
             </div>
             <div>
               <label className={lbl}>Cantidad recibida</label>
