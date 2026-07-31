@@ -17,6 +17,10 @@ export default function Inventario() {
   const [cargando, setCargando] = useState(true)
   const [subiendo, setSubiendo] = useState(null)   // id_inventario en proceso
   const [zoom, setZoom] = useState(null)           // url de imagen ampliada
+  const [detalle, setDetalle] = useState(null)     // artículo en detalle/edición
+  const [formEd, setFormEd] = useState(null)
+  const [msgEd, setMsgEd] = useState('')
+  const [guardandoEd, setGuardandoEd] = useState(false)
   const fileRef = useRef(null)
   const itemImagen = useRef(null)
 
@@ -48,6 +52,33 @@ export default function Inventario() {
 
   const colorDias = (d) =>
     d >= 90 ? 'text-red-700' : d >= 30 ? 'text-yellow-700' : 'text-acero-600'
+
+  const abrirDetalle = (i) => {
+    setDetalle(i)
+    setMsgEd('')
+    setFormEd({
+      nombre: i.nombre ?? '',
+      unidad_medida: i.unidad_medida ?? '',
+      stock_minimo: i.stock_minimo ?? 1,
+      id_area: i.id_area ?? '',
+    })
+  }
+
+  const guardarEdicion = async () => {
+    setMsgEd('')
+    if (!formEd.nombre.trim()) return setMsgEd('⚠ El nombre no puede quedar vacío.')
+    setGuardandoEd(true)
+    const { error } = await supabase.from('materiales_herramientas').update({
+      nombre: formEd.nombre.trim(),
+      unidad_medida: formEd.unidad_medida || null,
+      stock_minimo: Number(formEd.stock_minimo) || 0,
+      id_area: formEd.id_area || null,
+    }).eq('id_inventario', detalle.id_inventario)
+    setGuardandoEd(false)
+    if (error) return setMsgEd('❌ ' + error.message)
+    setMsgEd('✅ Cambios guardados y registrados en bitácora.')
+    cargar()
+  }
 
   const pedirImagen = (item) => {
     itemImagen.current = item
@@ -87,6 +118,100 @@ export default function Inventario() {
       {zoom && (
         <div className="fixed inset-0 bg-black/70 z-[95] grid place-items-center p-4" onClick={() => setZoom(null)}>
           <img src={zoom} alt="" className="max-h-[85vh] max-w-full rounded-lg shadow-2xl" />
+        </div>
+      )}
+
+      {/* Detalle / edición de artículo */}
+      {detalle && formEd && (
+        <div className="fixed inset-0 bg-black/40 z-[94] grid place-items-center p-4" onClick={() => setDetalle(null)}>
+          <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3 mb-4">
+              {detalle.imagen
+                ? <img src={detalle.imagen} alt="" className="w-16 h-16 object-cover rounded border border-acero-200" />
+                : <div className="w-16 h-16 rounded border border-dashed border-acero-200 grid place-items-center text-acero-200 text-2xl">📦</div>}
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-xs text-acero-600">{detalle.id_item}</div>
+                <h2 className="font-semibold leading-snug">{detalle.nombre}</h2>
+                <StockBadge alerta={detalle.alerta_stock} />
+              </div>
+            </div>
+
+            {/* Datos de solo lectura */}
+            <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+              {[
+                ['Stock actual', detalle.stock_calculado],
+                ['Entradas', '+' + detalle.total_entradas],
+                ['Salidas', '−' + detalle.total_salidas],
+              ].map(([k, v]) => (
+                <div key={k} className="bg-acero-50 rounded p-2.5">
+                  <div className="text-[11px] text-acero-600">{k}</div>
+                  <div className="font-mono text-lg">{v}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-acero-600 font-mono mb-4">
+              {detalle.dias_sin_movimiento === 0 ? 'Movido hoy' : `${detalle.dias_sin_movimiento} días sin movimiento`}
+              {' · '}últ. salida: {detalle.ultima_salida
+                ? new Date(detalle.ultima_salida).toLocaleDateString('es-MX')
+                : 'nunca'}
+            </p>
+
+            {/* Campos editables */}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-acero-600 mb-1">Nombre</label>
+                <input value={formEd.nombre} disabled={!puedeEditar}
+                  onChange={e => setFormEd(v => ({ ...v, nombre: e.target.value }))}
+                  className="w-full rounded border border-acero-200 px-3 py-2 text-sm disabled:bg-acero-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-acero-600 mb-1">Unidad de medida</label>
+                <input value={formEd.unidad_medida} disabled={!puedeEditar}
+                  onChange={e => setFormEd(v => ({ ...v, unidad_medida: e.target.value }))}
+                  className="w-full rounded border border-acero-200 px-3 py-2 text-sm disabled:bg-acero-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-acero-600 mb-1">Stock mínimo</label>
+                <input type="number" min="0" value={formEd.stock_minimo} disabled={!puedeEditar}
+                  onChange={e => setFormEd(v => ({ ...v, stock_minimo: e.target.value }))}
+                  className="w-full rounded border border-acero-200 px-3 py-2 text-sm font-mono disabled:bg-acero-50" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-acero-600 mb-1">Área</label>
+                <select value={formEd.id_area} disabled={!puedeEditar}
+                  onChange={e => setFormEd(v => ({ ...v, id_area: e.target.value }))}
+                  className="w-full rounded border border-acero-200 px-3 py-2 text-sm bg-white disabled:bg-acero-50">
+                  <option value="">— Sin área —</option>
+                  {areas.filter(a => a.activo !== false || a.id_area === formEd.id_area).map(a => (
+                    <option key={a.id_area} value={a.id_area}>
+                      {a.id_area} · {a.nombre_area}{a.activo === false ? ' (inactiva)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {msgEd && <p className="mt-3 text-sm bg-acero-50 border border-acero-200 rounded px-3 py-2">{msgEd}</p>}
+
+            <div className="flex gap-2 mt-4">
+              {puedeEditar && (
+                <button onClick={guardarEdicion} disabled={guardandoEd}
+                  className="flex-1 rounded bg-ambar-500 text-acero-950 py-2 text-sm font-semibold hover:bg-ambar-400 disabled:opacity-50">
+                  {guardandoEd ? 'Guardando…' : 'Guardar cambios'}
+                </button>
+              )}
+              <button onClick={() => setDetalle(null)}
+                className="rounded border border-acero-200 px-4 py-2 text-sm hover:bg-acero-50">
+                Cerrar
+              </button>
+            </div>
+            {puedeEditar && (
+              <p className="text-[11px] text-acero-600 mt-2">
+                Cada cambio queda registrado en la bitácora con tu usuario.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -146,13 +271,14 @@ export default function Inventario() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {filtrados.map(i => (
-          <div key={i.id_inventario} className="bg-white rounded-lg border border-acero-200 p-4">
+          <div key={i.id_inventario} onClick={() => abrirDetalle(i)}
+            className="bg-white rounded-lg border border-acero-200 p-4 cursor-pointer hover:border-acero-600 transition-colors">
             <div className="flex items-start gap-3">
               {/* Miniatura / botón de imagen */}
               <div className="shrink-0">
                 {i.imagen ? (
                   <img src={i.imagen} alt={i.nombre}
-                    onClick={() => setZoom(i.imagen)}
+                    onClick={e => { e.stopPropagation(); setZoom(i.imagen) }}
                     className="w-16 h-16 object-cover rounded border border-acero-200 cursor-zoom-in" />
                 ) : (
                   <div className="w-16 h-16 rounded border border-dashed border-acero-200 grid place-items-center text-acero-200 text-2xl">
@@ -160,7 +286,7 @@ export default function Inventario() {
                   </div>
                 )}
                 {puedeEditar && (
-                  <button onClick={() => pedirImagen(i)} disabled={subiendo === i.id_inventario}
+                  <button onClick={e => { e.stopPropagation(); pedirImagen(i) }} disabled={subiendo === i.id_inventario}
                     className="mt-1 w-16 text-[10px] text-acero-600 underline hover:text-acero-900 disabled:opacity-50">
                     {subiendo === i.id_inventario ? 'Subiendo…' : (i.imagen ? 'Cambiar' : '+ Imagen')}
                   </button>

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const TIPOS = ['Todos', 'Entrada', 'Salida', 'Devolución', 'PO']
+const TIPOS = ['Todos', 'Entrada', 'Salida', 'Devolución', 'PO', 'Edición']
 
 const badge = {
   'Entrada':    'bg-green-100 text-green-800 border-green-300',
   'Salida':     'bg-red-100 text-red-800 border-red-300',
   'Devolución': 'bg-blue-100 text-blue-800 border-blue-300',
   'PO':         'bg-ambar-400/20 text-yellow-800 border-ambar-500/50',
+  'Edición':    'bg-purple-100 text-purple-800 border-purple-300',
 }
 
 export default function Bitacora() {

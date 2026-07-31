@@ -79,6 +79,13 @@ export default function Catalogos() {
     cargar()
   }
 
+  const renombrarArea = async (id, nombre) => {
+    if (!nombre.trim()) return
+    const { error } = await supabase.from('areas').update({ nombre_area: nombre.trim() }).eq('id_area', id)
+    if (error) setMsg('❌ ' + error.message)
+    else { setMsg('✅ Área renombrada.'); cargar() }
+  }
+
   // Import CSV genérico para proveedores y requisitores
   const importarCSV = (tipo) => (e) => {
     setMsg('')
@@ -258,10 +265,34 @@ export default function Catalogos() {
               Agregar área
             </button>
           </div>
-          <Lista
-            filas={areas}
-            cols={[['id_area', 'ID'], ['nombre_area', 'Nombre']]}
-            idCol="id_area" tabla="areas" onToggle={toggleActivo} />
+          <div className="bg-white rounded-lg border border-acero-200 overflow-x-auto max-w-2xl">
+            <table className="w-full text-sm">
+              <thead className="bg-acero-50 text-acero-600 text-xs">
+                <tr>
+                  <th className="text-left px-4 py-2.5">ID</th>
+                  <th className="text-left px-4 py-2.5">Nombre (clic para editar)</th>
+                  <th className="text-center px-4 py-2.5">Activo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-acero-100">
+                {areas.map(a => (
+                  <tr key={a.id_area} className={a.activo === false ? 'opacity-50' : ''}>
+                    <td className="px-4 py-2.5 font-mono text-xs">{a.id_area}</td>
+                    <td className="px-4 py-2.5">
+                      <input defaultValue={a.nombre_area}
+                        onBlur={e => e.target.value !== a.nombre_area && renombrarArea(a.id_area, e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                        className="w-full max-w-64 rounded border border-transparent hover:border-acero-200 focus:border-acero-600 px-2 py-1 text-sm bg-transparent focus:bg-white" />
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <input type="checkbox" checked={a.activo !== false}
+                        onChange={e => toggleActivo('areas', 'id_area', a.id_area, e.target.checked)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
       {/* ---------- UNIDADES DE MEDIDA ---------- */}

@@ -9,6 +9,7 @@ export default function Salidas() {
   const [lista, setLista] = useState([])
   const [stock, setStock] = useState([])        // vw_stock con stock > 0
   const [areas, setAreas] = useState([])
+  const [busqueda, setBusqueda] = useState('')
   const [abierto, setAbierto] = useState(false)
   const [idItem, setIdItem] = useState('')
   const [cantidad, setCantidad] = useState('')
@@ -70,8 +71,13 @@ export default function Salidas() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-semibold">Salidas</h1>
+        <input
+          placeholder="Buscar por código, artículo o área…"
+          value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          className="rounded border border-acero-200 bg-white px-3 py-2 text-sm w-full sm:w-72 order-3 sm:order-none focus:outline-none focus:ring-2 focus:ring-ambar-400"
+        />
         {puedeCapturar && (
           <button onClick={() => { setAbierto(a => !a); setError(''); setOk('') }}
             className="rounded bg-acero-950 text-white px-4 py-2 text-sm font-medium hover:bg-acero-800">
@@ -139,7 +145,10 @@ export default function Salidas() {
             {lista.length === 0 && (
               <tr><td colSpan="4" className="px-4 py-6 text-center text-acero-600">Sin salidas registradas.</td></tr>
             )}
-            {lista.map(s => (
+            {lista
+              .filter(s => (s.id_item + ' ' + (s.materiales_herramientas?.nombre ?? '') + ' ' + (s.area_asignada ?? ''))
+                .toLowerCase().includes(busqueda.toLowerCase()))
+              .map(s => (
               <tr key={s.id_salida}>
                 <td className="px-4 py-2.5 font-mono text-xs">{new Date(s.fecha_salida).toLocaleString('es-MX')}</td>
                 <td className="px-4 py-2.5">
