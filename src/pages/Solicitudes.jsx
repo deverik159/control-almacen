@@ -14,7 +14,7 @@ const badgeEstatus = {
 }
 
 const formVacio = {
-  nombre_producto: '', descripcion: '', razon_social: RAZONES[0],
+  nombre_producto: '', descripcion: '', razones: [],
   unidad_medida: '', categoria: 'Producto', link_producto: '', ficha: null,
 }
 
@@ -50,6 +50,7 @@ export default function Solicitudes() {
   const guardar = async () => {
     limpiar()
     if (!form.nombre_producto.trim()) return setError('Indica el nombre del producto.')
+    if (form.razones.length === 0) return setError('Selecciona al menos una razón social.')
 
     setGuardando(true)
 
@@ -68,7 +69,7 @@ export default function Solicitudes() {
     const { error: e } = await supabase.from('solicitudes_alta').insert({
       nombre_producto: form.nombre_producto.trim(),
       descripcion: form.descripcion || null,
-      razon_social: form.razon_social,
+      razon_social: form.razones.join(', '),
       unidad_medida: form.unidad_medida || null,
       categoria: form.categoria,
       link_producto: form.link_producto || null,
@@ -165,12 +166,22 @@ export default function Solicitudes() {
               <textarea value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
                 rows={2} className={inp} />
             </div>
-            <div>
-              <label className={lbl}>Razón social</label>
-              <select value={form.razon_social} onChange={e => set('razon_social', e.target.value)}
-                className={inp + ' bg-white'}>
-                {RAZONES.map(r => <option key={r}>{r}</option>)}
-              </select>
+            <div className="sm:col-span-2">
+              <label className={lbl}>Razón social (una o varias)</label>
+              <div className="flex flex-wrap gap-2">
+                {RAZONES.map(r => {
+                  const sel = form.razones.includes(r)
+                  return (
+                    <button key={r} type="button"
+                      onClick={() => set('razones', sel ? form.razones.filter(x => x !== r) : [...form.razones, r])}
+                      className={`px-3 py-1.5 rounded text-xs border font-medium ${sel
+                        ? 'bg-acero-950 text-white border-acero-950'
+                        : 'bg-white border-acero-200 hover:border-acero-600'}`}>
+                      {sel ? '✓ ' : ''}{r}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             <div>
               <label className={lbl}>Categoría</label>

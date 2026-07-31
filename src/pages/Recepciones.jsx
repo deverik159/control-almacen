@@ -12,12 +12,12 @@ const MOTIVOS_ESPECIALES = {
 const poVacia = {
   po: '', fecha_po: new Date().toISOString().slice(0, 10),
   tipo_articulo: 'Existente', id_item: '', nombre_nuevo: '',
-  stock_minimo: 0, um: '', requisitor: '', proveedor: '',
+  stock_minimo: 1, um: '', requisitor: '', proveedor: '',
   area_asignada: '', cantidad_po: '', pu: '', ir: '', observaciones: '',
   cantidad_recepcion: '', factura_remision: '',
 }
 const espVacia = {
-  tipo_articulo: 'Existente', id_item: '', nombre_nuevo: '', stock_minimo: 0,
+  tipo_articulo: 'Existente', id_item: '', nombre_nuevo: '', stock_minimo: 1,
   unidad_medida: '', po_codigo: 'SIN_PO', cantidad: '', proveedor: '', area_asignada: '',
 }
 const recepVacia = { cantidad: '', factura_remision: '', observaciones: '' }
@@ -70,11 +70,6 @@ function SelectorArticulo({ f, setF, items }) {
             <input value={f.nombre_nuevo} onChange={e => setF(v => ({ ...v, nombre_nuevo: e.target.value }))}
               className={inp} />
           </div>
-          <div>
-            <label className={lbl}>Stock mínimo</label>
-            <input type="number" min="0" value={f.stock_minimo}
-              onChange={e => setF(v => ({ ...v, stock_minimo: e.target.value }))} className={inp} />
-          </div>
         </>
       )}
     </>
@@ -104,6 +99,7 @@ export default function Recepciones() {
   const [soloPendientes, setSoloPendientes] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [detalle, setDetalle] = useState(null)
+  const [historial, setHistorial] = useState(null)   // recepciones de la PO en detalle
   // Importación
   const [previewPOs, setPreviewPOs] = useState([])
   const [avisosImport, setAvisosImport] = useState([])
@@ -140,7 +136,7 @@ export default function Recepciones() {
       id_item: f.id_item.trim(),
       nombre: f.nombre_nuevo.trim(),
       stock_inicial: 0,
-      stock_minimo: Number(f.stock_minimo) || 0,
+      stock_minimo: Number(f.stock_minimo) || 1,   // default 1; editable después en Inventario/Importar
       unidad_medida: f.um || f.unidad_medida || null,
       id_area: f.area_asignada || null,
     })
@@ -419,6 +415,15 @@ export default function Recepciones() {
     cargar()
   }
 
+  const verHistorial = async () => {
+    if (historial) { setHistorial(null); return }
+    const { data } = await supabase.from('entradas')
+      .select('cantidad_recepcion, fecha_entrada, factura_remision, usuario')
+      .eq('id_po', detalle.id_po)
+      .order('fecha_entrada', { ascending: true })
+    setHistorial(data ?? [])
+  }
+
   const visibles = pos
     .filter(p => !soloPendientes || p.pendiente > 0)
     .filter(p => (p.po + ' ' + p.id_item + ' ' + (p.articulo ?? '') + ' ' + (p.proveedor ?? '') + ' ' + (p.requisitor ?? ''))
@@ -443,7 +448,7 @@ export default function Recepciones() {
           <div className="flex gap-2 flex-wrap">
             <button onClick={() => { setPanel(panel === 'po' ? null : 'po'); limpiar() }}
               className="rounded bg-acero-950 text-white px-4 py-2 text-sm font-medium hover:bg-acero-800">
-              {panel === 'po' ? 'Cancelar' : '+ Nueva PO'}
+              {panel === 'po' ? 'Cancelar' : '+ Nueva Recepción'}
             </button>
             <button onClick={() => { setPanel(panel === 'especial' ? null : 'especial'); limpiar() }}
               className="rounded border border-acero-950 px-4 py-2 text-sm font-medium hover:bg-acero-100">
@@ -467,7 +472,7 @@ export default function Recepciones() {
       {/* ---- Form Nueva PO (estructura completa) ---- */}
       {panel === 'po' && (
         <div className="bg-white rounded-lg border border-acero-200 p-5 mb-6 max-w-3xl">
-          <h2 className="font-semibold text-sm mb-4">Nueva orden de compra</h2>
+          <h2 className="font-semibold text-sm mb-4">Nueva recepción</h2>
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label className={lbl}>Número de PO</label>
@@ -489,14 +494,30 @@ export default function Recepciones() {
               <SelectorArticulo f={formPO} setF={setFormPO} items={items} />
             </div>
             <div>
-              <label className={lbl}>Unidad (UM)</label>
-              <input list="dl-um" value={formPO.um} placeholder="Pieza, Cubeta…"
-                onChange={e => setFormPO(v => ({ ...v, um: e.target.value }))} className={inp} />
+              <label className={lbl}>Área</label>
+              <select value={formPO.area_asignada}
+                onChange={e => setFormPO(v => ({ ...v, area_asignada: e.target.value }))}
+                className={inp + ' bg-white'}>
+                <option value="">— Selecciona —</option>
+                {areas.map(a => <option key={a.id_area} value={a.id_area}>{a.id_area} · {a.nombre_area}</option>)}
+              </select>
             </div>
             <div>
               <label className={lbl}>Cantidad PO</label>
               <input type="number" min="1" value={formPO.cantidad_po}
                 onChange={e => setFormPO(v => ({ ...v, cantidad_po: e.target.value }))}
+                className={inp + ' font-mono'} />
+            </div>
+            <div>
+              <label className={lbl}>Unidad (UM)</label>
+              <input list="dl-um" value={formPO.um} placeholder="Pieza, Cubeta…"
+                onChange={e => setFormPO(v => ({ ...v, um: e.target.value }))} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Cantidad recibida ahora</label>
+              <input type="number" min="0" value={formPO.cantidad_recepcion}
+                placeholder="0 si aún no llega"
+                onChange={e => setFormPO(v => ({ ...v, cantidad_recepcion: e.target.value }))}
                 className={inp + ' font-mono'} />
             </div>
             <div>
@@ -512,31 +533,15 @@ export default function Recepciones() {
                 className={inp} />
             </div>
             <div>
-              <label className={lbl}>Área</label>
-              <select value={formPO.area_asignada}
-                onChange={e => setFormPO(v => ({ ...v, area_asignada: e.target.value }))}
-                className={inp + ' bg-white'}>
-                <option value="">— Selecciona —</option>
-                {areas.map(a => <option key={a.id_area} value={a.id_area}>{a.id_area} · {a.nombre_area}</option>)}
-              </select>
+              <label className={lbl}>Factura y/o Remisión</label>
+              <input value={formPO.factura_remision}
+                onChange={e => setFormPO(v => ({ ...v, factura_remision: e.target.value }))}
+                className={inp + ' font-mono'} />
             </div>
             <div>
               <label className={lbl}>IR</label>
               <input value={formPO.ir} placeholder="IR-0000"
                 onChange={e => setFormPO(v => ({ ...v, ir: e.target.value }))} className={inp + ' font-mono'} />
-            </div>
-            <div>
-              <label className={lbl}>Cantidad recibida ahora</label>
-              <input type="number" min="0" value={formPO.cantidad_recepcion}
-                placeholder="0 si aún no llega"
-                onChange={e => setFormPO(v => ({ ...v, cantidad_recepcion: e.target.value }))}
-                className={inp + ' font-mono'} />
-            </div>
-            <div>
-              <label className={lbl}>Factura y/o Remisión</label>
-              <input value={formPO.factura_remision}
-                onChange={e => setFormPO(v => ({ ...v, factura_remision: e.target.value }))}
-                className={inp + ' font-mono'} />
             </div>
             <div>
               <label className={lbl}>Observaciones</label>
@@ -557,7 +562,7 @@ export default function Recepciones() {
           {error && <p className="mt-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</p>}
           <button onClick={guardarPO} disabled={guardando}
             className="mt-4 rounded bg-ambar-500 text-acero-950 px-5 py-2 text-sm font-semibold hover:bg-ambar-400 disabled:opacity-50">
-            {guardando ? 'Guardando…' : 'Crear PO'}
+            {guardando ? 'Guardando…' : 'Crear recepción'}
           </button>
         </div>
       )}
@@ -865,8 +870,52 @@ export default function Recepciones() {
             {detalle.observaciones && (
               <p className="mt-3 text-sm text-acero-600 border-t border-acero-100 pt-2">{detalle.observaciones}</p>
             )}
-            <button onClick={() => setDetalle(null)}
-              className="mt-4 rounded border border-acero-200 px-4 py-2 text-sm hover:bg-acero-50">Cerrar</button>
+
+            {/* Historial de recepciones */}
+            <button onClick={verHistorial}
+              className="mt-4 rounded bg-acero-950 text-white px-4 py-2 text-sm font-medium hover:bg-acero-800">
+              {historial ? 'Ocultar historial' : '📜 Historial de recepciones'}
+            </button>
+            {historial && (
+              <div className="mt-3 border border-acero-200 rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-acero-50 text-acero-600">
+                    <tr>
+                      <th className="text-left px-3 py-2">Fecha</th>
+                      <th className="text-right px-3 py-2">Cantidad</th>
+                      <th className="text-right px-3 py-2">Monto</th>
+                      <th className="text-left px-3 py-2">Factura/Remisión</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-acero-100">
+                    {historial.length === 0 && (
+                      <tr><td colSpan="4" className="px-3 py-3 text-center text-acero-600">
+                        Sin recepciones registradas en el sistema{detalle.recibido_historico > 0 ? ` (${detalle.recibido_historico} recibidas en el histórico importado)` : ''}.
+                      </td></tr>
+                    )}
+                    {historial.map((h, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 font-mono">{new Date(h.fecha_entrada).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="px-3 py-2 text-right font-mono">+{h.cantidad_recepcion}</td>
+                        <td className="px-3 py-2 text-right font-mono">{money(h.cantidad_recepcion * (detalle.pu ?? 0))}</td>
+                        <td className="px-3 py-2 font-mono">{h.factura_remision ?? '—'}</td>
+                      </tr>
+                    ))}
+                    {historial.length > 0 && detalle.recibido_historico > 0 && (
+                      <tr className="bg-acero-50">
+                        <td className="px-3 py-2 text-acero-600" colSpan="1">Histórico importado</td>
+                        <td className="px-3 py-2 text-right font-mono">+{detalle.recibido_historico}</td>
+                        <td className="px-3 py-2 text-right font-mono">{money(detalle.recibido_historico * (detalle.pu ?? 0))}</td>
+                        <td className="px-3 py-2">—</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <button onClick={() => { setDetalle(null); setHistorial(null) }}
+              className="mt-4 ml-2 rounded border border-acero-200 px-4 py-2 text-sm hover:bg-acero-50">Cerrar</button>
           </div>
         </div>
       )}
@@ -891,7 +940,8 @@ export default function Recepciones() {
               <th className="text-left px-3 py-2.5">Fecha</th>
               <th className="text-left px-3 py-2.5">Artículo</th>
               <th className="text-left px-3 py-2.5">Requisitor</th>
-              <th className="text-right px-3 py-2.5">Cant.</th>
+              <th className="text-right px-3 py-2.5">Cant. PO</th>
+              <th className="text-right px-3 py-2.5">Recibido</th>
               <th className="text-right px-3 py-2.5">Pend.</th>
               <th className="text-right px-3 py-2.5">Total</th>
               <th className="text-left px-3 py-2.5">Estatus</th>
@@ -900,12 +950,12 @@ export default function Recepciones() {
           </thead>
           <tbody className="divide-y divide-acero-100">
             {visibles.length === 0 && (
-              <tr><td colSpan="9" className="px-4 py-6 text-center text-acero-600">
+              <tr><td colSpan="10" className="px-4 py-6 text-center text-acero-600">
                 {soloPendientes ? 'Sin POs pendientes de recibir.' : 'Sin POs registradas.'}
               </td></tr>
             )}
             {visibles.map(p => (
-              <tr key={p.id_po} className="hover:bg-acero-50 cursor-pointer" onClick={() => setDetalle(p)}>
+              <tr key={p.id_po} className="hover:bg-acero-50 cursor-pointer" onClick={() => { setDetalle(p); setHistorial(null) }}>
                 <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{p.po}</td>
                 <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">
                   {fmtFecha(p.fecha_po)}
@@ -915,6 +965,7 @@ export default function Recepciones() {
                 </td>
                 <td className="px-3 py-2.5 text-xs">{p.requisitor ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right font-mono">{p.cantidad_po}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-green-700">{p.total_recibido}</td>
                 <td className="px-3 py-2.5 text-right font-mono font-semibold">{p.pendiente}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap">{money(p.total)}</td>
                 <td className="px-3 py-2.5">
@@ -926,7 +977,7 @@ export default function Recepciones() {
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                  {esAdmin && (
+                  {puedeCapturar && (
                     <button onClick={() => { setEditar({ ...p }); limpiar() }}
                       className="rounded border border-acero-300 px-2.5 py-1.5 text-xs font-medium hover:bg-acero-100 mr-1.5">
                       Editar

@@ -83,7 +83,7 @@ export default function Devoluciones() {
                 <option value="">— Selecciona una salida —</option>
                 {salidas.map(s => (
                   <option key={s.id_salida} value={s.id_salida}>
-                    {new Date(s.fecha_salida).toLocaleDateString('es-MX')} · {s.id_item} {s.nombre} · salió {s.cantidad}, devolvible {s.restante}
+                    {s.id_item} · {s.nombre}
                   </option>
                 ))}
               </select>

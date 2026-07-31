@@ -186,13 +186,16 @@ export default function Inventario() {
                     <div className="text-xs text-acero-600">{i.unidad_medida ?? 'unidades'} · mín. {i.stock_minimo}</div>
                   </div>
                   <div className="text-right text-xs text-acero-600 font-mono">
-                    <div>+{i.total_entradas} ent.</div>
-                    <div>−{i.total_salidas} sal.</div>
                     {i.dias_sin_movimiento != null && (
                       <div className={colorDias(i.dias_sin_movimiento)}>
                         {i.dias_sin_movimiento === 0 ? 'movido hoy' : `${i.dias_sin_movimiento} d sin mov.`}
                       </div>
                     )}
+                    <div>
+                      últ. salida: {i.ultima_salida
+                        ? new Date(i.ultima_salida).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit' })
+                        : '—'}
+                    </div>
                   </div>
                 </div>
               </div>
