@@ -11,7 +11,7 @@ const nav = [
   { to: '/solicitudes',  label: 'Solicitudes',   roles: null },
   { to: '/bitacora',     label: 'Bitácora',      roles: null },
   { to: '/catalogos',    label: 'Catálogos',     roles: ['Admin'] },
-  { to: '/importar',     label: 'Importar',      roles: ['Admin'] },
+  { to: '/importar',     label: 'Importar',      roles: ['Admin', 'Gerente', 'Almacenista'] },
   { to: '/usuarios',     label: 'Usuarios',      roles: ['Admin'] },
 ]
 
