@@ -5,7 +5,7 @@ import StockBadge from '../components/StockBadge'
 
 export default function Inventario() {
   const { perfil } = useAuth()
-  const puedeEditar = ['Admin', 'Almacenista'].includes(perfil?.rol)
+  const puedeEditar = ['Admin', 'Gerente', 'Almacenista'].includes(perfil?.rol)
 
   const [items, setItems] = useState([])
   const [areas, setAreas] = useState([])
@@ -296,7 +296,7 @@ export default function Inventario() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-mono text-xs text-acero-600">{i.id_item}</div>
+                    <div className="font-mono text-xs text-acero-600">ID: {i.id_item}</div>
                     <div className="font-semibold leading-snug">{i.nombre}</div>
                     {i.id_area && (
                       <div className="text-[11px] text-acero-600 mt-0.5">

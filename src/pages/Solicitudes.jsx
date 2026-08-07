@@ -20,7 +20,7 @@ const formVacio = {
 
 export default function Solicitudes() {
   const { session, perfil } = useAuth()
-  const esAlmacen = ['Admin', 'Almacenista'].includes(perfil?.rol)
+  const esAlmacen = ['Admin', 'Gerente', 'Almacenista'].includes(perfil?.rol)
 
   const [lista, setLista] = useState([])
   const [unidades, setUnidades] = useState([])

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
-const ROLES = ['Admin', 'Almacenista', 'Consulta']
+const ROLES = ['Admin', 'Gerente', 'Almacenista', 'Consulta']
 
 export default function Usuarios() {
   const { session } = useAuth()

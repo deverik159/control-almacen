@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Salidas() {
   const { session, perfil } = useAuth()
-  const puedeCapturar = ['Admin', 'Almacenista'].includes(perfil?.rol)
+  const puedeCapturar = ['Admin', 'Gerente', 'Almacenista'].includes(perfil?.rol)
 
   const [lista, setLista] = useState([])
   const [stock, setStock] = useState([])        // vw_stock con stock > 0

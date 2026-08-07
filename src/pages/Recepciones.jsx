@@ -52,7 +52,11 @@ function SelectorArticulo({ f, setF, items }) {
       {f.tipo_articulo === 'Existente' ? (
         <div className="sm:col-span-2">
           <label className={lbl}>Artículo</label>
-          <select value={f.id_item} onChange={e => setF(v => ({ ...v, id_item: e.target.value }))}
+          <select value={f.id_item}
+            onChange={e => {
+              const it = items.find(x => x.id_item === e.target.value)
+              setF(v => ({ ...v, id_item: e.target.value, um: it?.unidad_medida ?? v.um ?? '' }))
+            }}
             className={inp + ' bg-white'}>
             <option value="">— Selecciona —</option>
             {items.map(i => <option key={i.id_item} value={i.id_item}>{i.id_item} · {i.nombre}</option>)}
@@ -78,7 +82,8 @@ function SelectorArticulo({ f, setF, items }) {
 
 export default function Recepciones() {
   const { session, perfil } = useAuth()
-  const puedeCapturar = ['Admin', 'Almacenista'].includes(perfil?.rol)
+  const puedeCapturar = ['Admin', 'Gerente', 'Almacenista'].includes(perfil?.rol)
+  const puedeCorregir = ['Admin', 'Gerente'].includes(perfil?.rol)
   const esAdmin = perfil?.rol === 'Admin'
 
   const [pos, setPos] = useState([])
@@ -100,6 +105,7 @@ export default function Recepciones() {
   const [busqueda, setBusqueda] = useState('')
   const [detalle, setDetalle] = useState(null)
   const [historial, setHistorial] = useState(null)   // recepciones de la PO en detalle
+  const [editHist, setEditHist] = useState(null)     // recepción del historial en corrección
   // Importación
   const [previewPOs, setPreviewPOs] = useState([])
   const [avisosImport, setAvisosImport] = useState([])
@@ -415,10 +421,30 @@ export default function Recepciones() {
     cargar()
   }
 
+  const guardarCorreccion = async () => {
+    limpiar()
+    const cant = Number(editHist.cantidad)
+    if (!cant || cant <= 0) return setError('La cantidad debe ser mayor a cero.')
+    const nuevoTotal = detalle.total_recibido - editHist.original + cant
+    if (nuevoTotal > detalle.cantidad_po)
+      return setError('Con esa corrección el total recibido (' + nuevoTotal + ') excedería la cantidad de la PO (' + detalle.cantidad_po + ').')
+
+    setGuardando(true)
+    const { error: e } = await supabase.from('entradas').update({
+      cantidad_recepcion: cant,
+      factura_remision: editHist.factura || null,
+    }).eq('id_entrada', editHist.id_entrada)
+    setGuardando(false)
+    if (e) return setError('No se pudo corregir: ' + e.message)
+    setOk('Recepción corregida y registrada en bitácora.')
+    setEditHist(null); setHistorial(null); setDetalle(null)
+    cargar()
+  }
+
   const verHistorial = async () => {
     if (historial) { setHistorial(null); return }
     const { data } = await supabase.from('entradas')
-      .select('cantidad_recepcion, fecha_entrada, factura_remision, usuario')
+      .select('id_entrada, cantidad_recepcion, fecha_entrada, factura_remision, usuario')
       .eq('id_po', detalle.id_po)
       .order('fecha_entrada', { ascending: true })
     setHistorial(data ?? [])
@@ -885,11 +911,12 @@ export default function Recepciones() {
                       <th className="text-right px-3 py-2">Cantidad</th>
                       <th className="text-right px-3 py-2">Monto</th>
                       <th className="text-left px-3 py-2">Factura/Remisión</th>
+                      <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-acero-100">
                     {historial.length === 0 && (
-                      <tr><td colSpan="4" className="px-3 py-3 text-center text-acero-600">
+                      <tr><td colSpan="5" className="px-3 py-3 text-center text-acero-600">
                         Sin recepciones registradas en el sistema{detalle.recibido_historico > 0 ? ` (${detalle.recibido_historico} recibidas en el histórico importado)` : ''}.
                       </td></tr>
                     )}
@@ -899,6 +926,19 @@ export default function Recepciones() {
                         <td className="px-3 py-2 text-right font-mono">+{h.cantidad_recepcion}</td>
                         <td className="px-3 py-2 text-right font-mono">{money(h.cantidad_recepcion * (detalle.pu ?? 0))}</td>
                         <td className="px-3 py-2 font-mono">{h.factura_remision ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">
+                          {puedeCorregir && (
+                            <button onClick={() => setEditHist({
+                              id_entrada: h.id_entrada,
+                              cantidad: String(h.cantidad_recepcion),
+                              original: h.cantidad_recepcion,
+                              factura: h.factura_remision ?? '',
+                            })}
+                              className="rounded border border-acero-300 px-2 py-1 text-[11px] hover:bg-acero-100">
+                              ✏ Editar
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {historial.length > 0 && detalle.recibido_historico > 0 && (
@@ -914,7 +954,37 @@ export default function Recepciones() {
               </div>
             )}
 
-            <button onClick={() => { setDetalle(null); setHistorial(null) }}
+            {editHist && (
+              <div className="mt-3 border border-ambar-500/50 bg-ambar-400/10 rounded p-3">
+                <p className="text-xs font-semibold mb-2">Corregir recepción</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-acero-600 mb-1">Cantidad</label>
+                    <input type="number" min="1" value={editHist.cantidad}
+                      onChange={e => setEditHist(v => ({ ...v, cantidad: e.target.value }))}
+                      className={inp + ' font-mono'} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-acero-600 mb-1">Factura y/o Remisión</label>
+                    <input value={editHist.factura}
+                      onChange={e => setEditHist(v => ({ ...v, factura: e.target.value }))}
+                      className={inp + ' font-mono'} />
+                  </div>
+                </div>
+                {error && <p className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>}
+                <div className="flex gap-2 mt-2">
+                  <button onClick={guardarCorreccion} disabled={guardando}
+                    className="rounded bg-ambar-500 text-acero-950 px-4 py-1.5 text-xs font-semibold hover:bg-ambar-400 disabled:opacity-50">
+                    {guardando ? 'Guardando…' : 'Guardar corrección'}
+                  </button>
+                  <button onClick={() => { setEditHist(null); limpiar() }}
+                    className="rounded border border-acero-200 px-3 py-1.5 text-xs hover:bg-acero-50">Cancelar</button>
+                </div>
+                <p className="text-[10px] text-acero-600 mt-1.5">La corrección ajusta stock y estatus de la PO, y queda en bitácora con tu usuario.</p>
+              </div>
+            )}
+
+            <button onClick={() => { setDetalle(null); setHistorial(null); setEditHist(null) }}
               className="mt-4 ml-2 rounded border border-acero-200 px-4 py-2 text-sm hover:bg-acero-50">Cerrar</button>
           </div>
         </div>
