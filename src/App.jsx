@@ -32,7 +32,7 @@ export default function App() {
               <ProtectedRoute roles={['Admin']}><Catalogos /></ProtectedRoute>
             } />
             <Route path="/importar" element={
-              <ProtectedRoute roles={['Admin']}><Importar /></ProtectedRoute>
+              <ProtectedRoute roles={['Admin', 'Gerente', 'Almacenista']}><Importar /></ProtectedRoute>
             } />
             <Route path="/usuarios" element={
               <ProtectedRoute roles={['Admin']}><Usuarios /></ProtectedRoute>
