@@ -10,7 +10,7 @@ const nav = [
   { to: '/devoluciones', label: 'Devoluciones',  roles: null },
   { to: '/solicitudes',  label: 'Solicitudes',   roles: null },
   { to: '/bitacora',     label: 'Bitácora',      roles: null },
-  { to: '/catalogos',    label: 'Catálogos',     roles: ['Admin'] },
+  { to: '/catalogos',    label: 'Catálogos',     roles: ['Admin', 'Gerente'] },
   { to: '/importar',     label: 'Importar',      roles: ['Admin', 'Gerente', 'Almacenista'] },
   { to: '/usuarios',     label: 'Usuarios',      roles: ['Admin'] },
 ]
