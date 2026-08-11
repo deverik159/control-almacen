@@ -29,7 +29,7 @@ export default function App() {
             <Route path="/solicitudes" element={<Solicitudes />} />
             <Route path="/bitacora" element={<Bitacora />} />
             <Route path="/catalogos" element={
-              <ProtectedRoute roles={['Admin']}><Catalogos /></ProtectedRoute>
+              <ProtectedRoute roles={['Admin', 'Gerente']}><Catalogos /></ProtectedRoute>
             } />
             <Route path="/importar" element={
               <ProtectedRoute roles={['Admin', 'Gerente', 'Almacenista']}><Importar /></ProtectedRoute>
