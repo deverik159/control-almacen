@@ -502,7 +502,7 @@ export default function Recepciones() {
               className="rounded border border-acero-950 px-4 py-2 text-sm font-medium hover:bg-acero-100">
               Recepción sin PO
             </button>
-            {esAdmin && (
+            {puedeCapturar && (
               <button onClick={() => { setPanel(panel === 'importar' ? null : 'importar'); limpiar(); setPreviewPOs([]); setAvisosImport([]) }}
                 className="rounded border border-acero-950 px-4 py-2 text-sm font-medium hover:bg-acero-100">
                 ⬆ Importar POs
