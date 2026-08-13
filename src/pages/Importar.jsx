@@ -24,7 +24,7 @@ function parseCSV(texto) {
   return filas
 }
 
-const COLUMNAS = ['id_item', 'nombre', 'stock_inicial', 'stock_minimo', 'unidad_medida', 'id_area', 'entradas', 'salidas']
+const COLUMNAS = ['id_item', 'nombre', 'stock_inicial', 'stock_minimo', 'unidad_medida', 'id_area']
 
 export default function Importar() {
   const [preview, setPreview] = useState([])
@@ -57,9 +57,7 @@ export default function Importar() {
           stock_minimo: idx.stock_minimo >= 0 ? Number(f[idx.stock_minimo]) || 0 : 0,
           unidad_medida: idx.unidad_medida >= 0 ? (f[idx.unidad_medida] ?? '').trim() || null : null,
           id_area: idx.id_area >= 0 ? (f[idx.id_area] ?? '').trim() || null : null,
-          entradas_hist: idx.entradas >= 0 ? Number(f[idx.entradas]) || 0 : 0,
-          salidas_hist: idx.salidas >= 0 ? Number(f[idx.salidas]) || 0 : 0,
-          fecha_alta: new Date().toISOString(),   // último movimiento = momento de la importación
+          fecha_alta: new Date().toISOString(),
         }
         if (!r.id_item) errs.push(`Fila ${n + 2}: sin id_item, se omitirá.`)
         if (!r.nombre) errs.push(`Fila ${n + 2}: sin nombre, se omitirá.`)
@@ -99,10 +97,9 @@ export default function Importar() {
         Carga tu base de almacén desde un archivo CSV. Columnas obligatorias:{' '}
         <code className="font-mono text-xs bg-acero-50 border border-acero-200 rounded px-1">
           id_item, nombre, stock_inicial, stock_minimo, unidad_medida, id_area
-        </code>. Opcionales:{' '}
-        <code className="font-mono text-xs bg-acero-50 border border-acero-200 rounded px-1">entradas, salidas</code>{' '}
-        (acumulados históricos: suman/restan al stock y se muestran en el detalle del artículo).
-        La fecha de último movimiento y los días sin movimiento parten del momento de la importación.
+        </code>. <b>stock_inicial es la base ANTES de los movimientos históricos.</b>{' '}
+        Orden de carga completo: 1) este inventario → 2) recepciones históricas (en Recepciones →
+        Importar POs) → 3) salidas históricas (en Salidas → Importar salidas).
         Si un código ya existe, se actualizan sus datos sin duplicarlo.
       </p>
 
@@ -148,8 +145,6 @@ export default function Importar() {
                   <th className="text-right px-4 py-2.5">Mínimo</th>
                   <th className="text-left px-4 py-2.5">Unidad</th>
                   <th className="text-left px-4 py-2.5">Área</th>
-                  <th className="text-right px-4 py-2.5">Entradas</th>
-                  <th className="text-right px-4 py-2.5">Salidas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-acero-100">
@@ -161,8 +156,6 @@ export default function Importar() {
                     <td className="px-4 py-2 text-right font-mono">{r.stock_minimo}</td>
                     <td className="px-4 py-2">{r.unidad_medida ?? '—'}</td>
                     <td className="px-4 py-2">{r.id_area ?? '—'}</td>
-                    <td className="px-4 py-2 text-right font-mono">+{r.entradas_hist}</td>
-                    <td className="px-4 py-2 text-right font-mono">−{r.salidas_hist}</td>
                   </tr>
                 ))}
               </tbody>

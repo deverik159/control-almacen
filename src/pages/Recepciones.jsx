@@ -339,7 +339,8 @@ export default function Recepciones() {
           area_asignada: v(f, idx.area) || null,
           requisitor: v(f, idx.requisitor) || null,
           cantidad_po: cantPO,
-          recibido_historico: Math.min(recibido, cantPO),
+          recibido_historico: 0,   // el recibido se importa como recepciones reales (historial)
+          _recepcion: Math.min(recibido, cantPO),
           pu: parseMonto(v(f, idx.pu)),
           estatus: ['Completo', 'Parcial'].includes(v(f, idx.estatus))
             ? v(f, idx.estatus)
@@ -401,8 +402,9 @@ export default function Recepciones() {
     }
 
     // 2) Upsert de POs: si el id_po_legacy ya existe, se actualiza sin duplicar
-    const conLegacy = previewPOs.filter(r => r.id_po_legacy)
-    const sinLegacy = previewPOs.filter(r => !r.id_po_legacy)
+    const limpiarAux = ({ _recepcion, ...resto }) => resto
+    const conLegacy = previewPOs.filter(r => r.id_po_legacy).map(limpiarAux)
+    const sinLegacy = previewPOs.filter(r => !r.id_po_legacy).map(limpiarAux)
     let err = null
     if (conLegacy.length) {
       const { error: e2 } = await supabase.from('pos')
@@ -413,10 +415,30 @@ export default function Recepciones() {
       const { error: e3 } = await supabase.from('pos').insert(sinLegacy)
       err = e3
     }
-    setImportando(false)
-    if (err) return setError('Error al importar POs: ' + err.message)
+    if (err) { setImportando(false); return setError('Error al importar POs: ' + err.message) }
 
-    setOk(`✅ Importación completa: ${previewPOs.length} POs cargadas.`)
+    // 3) Recepciones históricas → filas reales en entradas (historial visible)
+    const recepciones = previewPOs
+      .filter(r => r._recepcion > 0)
+      .map(r => ({
+        id_po_legacy: r.id_po_legacy,
+        id_item: r.id_item,
+        cantidad: r._recepcion,
+        fecha: r.fecha_po,
+        po: r.po,
+        proveedor: r.proveedor,
+        area: r.area_asignada,
+        factura: r.factura_remision,
+      }))
+    let creadas = 0
+    if (recepciones.length) {
+      const { data: n, error: e4 } = await supabase.rpc('importar_recepciones_historicas', { filas: recepciones })
+      if (e4) { setImportando(false); return setError('POs cargadas, pero falló el historial de recepciones: ' + e4.message) }
+      creadas = n ?? recepciones.length
+    }
+    setImportando(false)
+
+    setOk(`✅ Importación completa: ${previewPOs.length} POs y ${creadas} recepciones históricas cargadas.`)
     setPreviewPOs([]); setAvisosImport([]); setPanel(null)
     cargar()
   }
@@ -653,9 +675,10 @@ export default function Recepciones() {
           <p className="text-xs text-acero-600 mb-3 max-w-3xl">
             Usa el CSV exportado de tu hoja de POs. Se leen: ID_PO, Fecha Recepción, PO, Área, Requisitor,
             ID_Item, Descripción, UM, Cantidad PO, Cantidad Recepción, PU, Estatus, Factura y/o Remisión,
-            Proveedor, Observaciones e IR. Los importes y faltantes se calculan solos. Lo ya recibido se
-            registra como histórico: <b>no modifica el stock actual</b>. Si reimportas el mismo archivo,
-            las POs se actualizan sin duplicarse.
+            Proveedor, Observaciones e IR. Los importes y faltantes se calculan solos. Lo ya recibido se importa como <b>recepciones reales con su fecha</b>: alimenta el historial 📜,
+            la bitácora y el stock (stock = inicial + entradas − salidas, así que el stock_inicial del
+            maestro debe ser la base ANTES de estos movimientos). Reimportar reemplaza el historial
+            importado anterior, sin duplicar.
           </p>
           <input type="file" accept=".csv,text/csv" onChange={leerCSVPOs}
             className="text-sm file:mr-3 file:rounded file:border-0 file:bg-acero-950 file:text-white file:px-4 file:py-2 file:text-sm file:cursor-pointer" />
@@ -696,7 +719,7 @@ export default function Recepciones() {
                         <td className="px-3 py-1.5 font-mono">{r.fecha_po ?? '—'}</td>
                         <td className="px-3 py-1.5"><span className="font-mono text-acero-600">{r.id_item}</span> {r.articulo}</td>
                         <td className="px-3 py-1.5 text-right font-mono">{r.cantidad_po}</td>
-                        <td className="px-3 py-1.5 text-right font-mono">{r.recibido_historico}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{r._recepcion}</td>
                         <td className="px-3 py-1.5 text-right font-mono">{money(r.pu)}</td>
                         <td className="px-3 py-1.5">{r.estatus}</td>
                       </tr>
