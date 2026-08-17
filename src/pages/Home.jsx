@@ -92,6 +92,24 @@ export default function Home() {
       <h1 className="text-2xl font-semibold mb-1">Hola, {perfil?.nombre?.split(' ')[0]}</h1>
       <p className="text-acero-600 text-sm mb-6">Estado del almacén al día de hoy.</p>
 
+      {/* POs pendientes — prioridad del día */}
+      <section className="bg-white rounded-lg border border-acero-200 mb-4">
+        <header className="px-4 py-3 border-b border-acero-100 flex justify-between items-center">
+          <h2 className="font-semibold text-sm">📦 POs pendientes</h2>
+          <Link to="/recepciones" className="text-xs underline text-acero-600">Recepciones</Link>
+        </header>
+        {pendientes.length === 0
+          ? <p className="p-4 text-sm text-acero-600">Sin POs parciales.</p>
+          : <ul className="divide-y divide-acero-100">
+              {pendientes.map(p => (
+                <li key={p.id_po} className="px-4 py-2.5 flex justify-between text-sm gap-2">
+                  <span className="truncate"><b className="font-mono">{p.po}</b> · {p.articulo}</span>
+                  <span className="font-mono whitespace-nowrap">pendientes: {p.pendiente}</span>
+                </li>
+              ))}
+            </ul>}
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-2 mb-4">
         {/* Movimientos por día */}
         <section className="bg-white rounded-lg border border-acero-200 p-4">
@@ -183,23 +201,6 @@ export default function Home() {
               </ul>}
         </section>
 
-        {/* POs pendientes */}
-        <section className="bg-white rounded-lg border border-acero-200">
-          <header className="px-4 py-3 border-b border-acero-100 flex justify-between items-center">
-            <h2 className="font-semibold text-sm">📦 POs pendientes</h2>
-            <Link to="/recepciones" className="text-xs underline text-acero-600">Recepciones</Link>
-          </header>
-          {pendientes.length === 0
-            ? <p className="p-4 text-sm text-acero-600">Sin POs parciales.</p>
-            : <ul className="divide-y divide-acero-100">
-                {pendientes.map(p => (
-                  <li key={p.id_po} className="px-4 py-2.5 flex justify-between text-sm gap-2">
-                    <span className="truncate"><b className="font-mono">{p.po}</b> · {p.articulo}</span>
-                    <span className="font-mono whitespace-nowrap">faltan {p.pendiente}</span>
-                  </li>
-                ))}
-              </ul>}
-        </section>
       </div>
     </div>
   )

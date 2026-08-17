@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { parseCSV, normalizarHeader } from '../lib/csv'
+import { parseCSV, normalizarHeader, leerArchivoTexto } from '../lib/csv'
 
 const inp = "w-full rounded border border-acero-200 px-3 py-2 text-sm"
 const lbl = "block text-xs font-medium text-acero-600 mb-1"
@@ -91,9 +91,8 @@ export default function Catalogos() {
     setMsg('')
     const archivo = e.target.files[0]
     if (!archivo) return
-    const lector = new FileReader()
-    lector.onload = async () => {
-      const filas = parseCSV(lector.result)
+    leerArchivoTexto(archivo).then(async (texto) => {
+      const filas = parseCSV(texto)
       if (filas.length < 2) return setMsg('⚠ El archivo está vacío o solo tiene encabezados.')
       const h = filas[0].map(normalizarHeader)
       const col = n => h.indexOf(n)
@@ -131,8 +130,7 @@ export default function Catalogos() {
       if (error) return setMsg('❌ Error al importar: ' + error.message)
       setMsg(`✅ Importación completa: ${registros.length} ${tipo}.`)
       cargar()
-    }
-    lector.readAsText(archivo, 'utf-8')
+    })
     e.target.value = ''
   }
 

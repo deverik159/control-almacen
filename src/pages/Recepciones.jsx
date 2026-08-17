@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { parseCSV, normalizarHeader, parseMonto, parseFechaDMA } from '../lib/csv'
+import { parseCSV, normalizarHeader, parseMonto, parseFechaDMA, leerArchivoTexto } from '../lib/csv'
 
 const MOTIVOS_ESPECIALES = {
   SIN_PO: 'Entrada legítima que no tiene orden de compra: compra directa, urgencia, caja chica.',
@@ -20,7 +20,7 @@ const espVacia = {
   tipo_articulo: 'Existente', id_item: '', nombre_nuevo: '', stock_minimo: 1,
   unidad_medida: '', po_codigo: 'SIN_PO', cantidad: '', proveedor: '', area_asignada: '',
 }
-const recepVacia = { cantidad: '', factura_remision: '', observaciones: '' }
+const recepVacia = { cantidad: '', factura_remision: '', ir: '', observaciones: '', fecha: new Date().toISOString().slice(0, 10) }
 
 const money = (n) => n == null ? '—' :
   Number(n).toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
@@ -105,6 +105,7 @@ export default function Recepciones() {
   const [busqueda, setBusqueda] = useState('')
   const [detalle, setDetalle] = useState(null)
   const [historial, setHistorial] = useState(null)   // recepciones de la PO en detalle
+  const [listasDoc, setListasDoc] = useState(null)    // IRs y facturas acumuladas de la PO
   const [editHist, setEditHist] = useState(null)     // recepción del historial en corrección
   // Importación
   const [previewPOs, setPreviewPOs] = useState([])
@@ -199,6 +200,7 @@ export default function Recepciones() {
         proveedor: f.proveedor || null,
         area_asignada: f.area_asignada || null,
         factura_remision: f.factura_remision || null,
+        ir: f.ir || null,
         usuario: session.user.id,
       })
       if (e2) { setGuardando(false); return setError('PO creada, pero falló la recepción inicial: ' + e2.message + '. Regístrala con el botón Recibir.') }
@@ -231,8 +233,10 @@ export default function Recepciones() {
       proveedor: recibir.proveedor,
       area_asignada: recibir.area_asignada,
       factura_remision: formRecep.factura_remision || null,
+      ir: formRecep.ir || null,
       observaciones: formRecep.observaciones || null,
       usuario: session.user.id,
+      fecha_entrada: formRecep.fecha ? new Date(formRecep.fecha + 'T12:00').toISOString() : undefined,
     })
     setGuardando(false)
     if (e) return setError('No se pudo registrar la recepción: ' + e.message)
@@ -306,9 +310,8 @@ export default function Recepciones() {
     limpiar(); setPreviewPOs([]); setAvisosImport([])
     const archivo = e.target.files[0]
     if (!archivo) return
-    const lector = new FileReader()
-    lector.onload = () => {
-      const filas = parseCSV(lector.result)
+    leerArchivoTexto(archivo).then((texto) => {
+      const filas = parseCSV(texto)
       if (filas.length < 2) return setAvisosImport(['El archivo está vacío o solo tiene encabezados.'])
 
       const h = filas[0].map(normalizarHeader)
@@ -371,8 +374,7 @@ export default function Recepciones() {
 
       setAvisosImport(avisos)
       setPreviewPOs(limpios)
-    }
-    lector.readAsText(archivo, 'utf-8')
+    })
     e.target.value = ''
   }
 
@@ -429,6 +431,7 @@ export default function Recepciones() {
         proveedor: r.proveedor,
         area: r.area_asignada,
         factura: r.factura_remision,
+        ir: r.ir,
       }))
     let creadas = 0
     if (recepciones.length) {
@@ -463,10 +466,21 @@ export default function Recepciones() {
     cargar()
   }
 
+  const cargarListasDoc = async (p) => {
+    setListasDoc(null)
+    const { data } = await supabase.from('entradas')
+      .select('ir, factura_remision').eq('id_po', p.id_po)
+    const unicos = (arr) => [...new Set(arr.filter(Boolean).map(x => String(x).trim()).filter(Boolean))]
+    setListasDoc({
+      irs: unicos([p.ir, ...(data ?? []).map(x => x.ir)]).join(', '),
+      facturas: unicos([p.factura_remision, ...(data ?? []).map(x => x.factura_remision)]).join(', '),
+    })
+  }
+
   const verHistorial = async () => {
     if (historial) { setHistorial(null); return }
     const { data } = await supabase.from('entradas')
-      .select('id_entrada, cantidad_recepcion, fecha_entrada, factura_remision, usuario')
+      .select('id_entrada, cantidad_recepcion, fecha_entrada, factura_remision, ir, usuario')
       .eq('id_po', detalle.id_po)
       .order('fecha_entrada', { ascending: true })
     setHistorial(data ?? [])
@@ -765,6 +779,20 @@ export default function Recepciones() {
                   onChange={e => setFormRecep(v => ({ ...v, cantidad: e.target.value }))} autoFocus
                   className={inp + ' font-mono text-lg'} />
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={lbl}>Fecha de la recepción</label>
+                  <input type="date" value={formRecep.fecha}
+                    onChange={e => setFormRecep(v => ({ ...v, fecha: e.target.value }))}
+                    className={inp} />
+                </div>
+                <div>
+                  <label className={lbl}>IR de esta recepción</label>
+                  <input value={formRecep.ir} placeholder="IR-0000"
+                    onChange={e => setFormRecep(v => ({ ...v, ir: e.target.value }))}
+                    className={inp + ' font-mono'} />
+                </div>
+              </div>
               <div>
                 <label className={lbl}>Factura y/o Remisión</label>
                 <input value={formRecep.factura_remision}
@@ -891,7 +919,7 @@ export default function Recepciones() {
       {detalle && (
         <div className="fixed inset-0 bg-black/40 grid place-items-center p-4 z-50" onClick={() => setDetalle(null)}>
           <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <h2 className="font-semibold mb-3">PO <span className="font-mono">{detalle.po}</span></h2>
+            <h2 className="font-semibold mb-3 font-mono">{detalle.po}</h2>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {[
                 ['Fecha', fmtFecha(detalle.fecha_po)],
@@ -901,14 +929,14 @@ export default function Recepciones() {
                 ['Requisitor', detalle.requisitor ?? '—'],
                 ['Área', nombreArea(detalle.area_asignada)],
                 ['Proveedor', detalle.proveedor ?? '—'],
-                ['IR', detalle.ir ?? '—'],
+                ['IR', listasDoc ? (listasDoc.irs || '—') : (detalle.ir ?? '—')],
                 ['Cantidad PO', detalle.cantidad_po],
                 ['Recibido', detalle.total_recibido],
                 ['Pendiente', detalle.pendiente],
                 ['PU', money(detalle.pu)],
                 ['Subtotal', money(detalle.subtotal)],
                 ['Total (IVA 16%)', money(detalle.total)],
-                ['Factura/Remisión', detalle.factura_remision ?? '—'],
+                ['Factura/Remisión', listasDoc ? (listasDoc.facturas || '—') : (detalle.factura_remision ?? '—')],
               ].map(([k, val]) => (
                 <div key={k}>
                   <dt className="text-xs text-acero-600">{k}</dt>
@@ -933,13 +961,14 @@ export default function Recepciones() {
                       <th className="text-left px-3 py-2">Fecha</th>
                       <th className="text-right px-3 py-2">Cantidad</th>
                       <th className="text-right px-3 py-2">Monto</th>
+                      <th className="text-left px-3 py-2">IR</th>
                       <th className="text-left px-3 py-2">Factura/Remisión</th>
                       <th className="px-3 py-2"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-acero-100">
                     {historial.length === 0 && (
-                      <tr><td colSpan="5" className="px-3 py-3 text-center text-acero-600">
+                      <tr><td colSpan="6" className="px-3 py-3 text-center text-acero-600">
                         Sin recepciones registradas en el sistema{detalle.recibido_historico > 0 ? ` (${detalle.recibido_historico} recibidas en el histórico importado)` : ''}.
                       </td></tr>
                     )}
@@ -948,6 +977,7 @@ export default function Recepciones() {
                         <td className="px-3 py-2 font-mono">{new Date(h.fecha_entrada).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-3 py-2 text-right font-mono">+{h.cantidad_recepcion}</td>
                         <td className="px-3 py-2 text-right font-mono">{money(h.cantidad_recepcion * (detalle.pu ?? 0))}</td>
+                        <td className="px-3 py-2 font-mono">{h.ir ?? '—'}</td>
                         <td className="px-3 py-2 font-mono">{h.factura_remision ?? '—'}</td>
                         <td className="px-3 py-2 text-right">
                           {puedeCorregir && (
@@ -1034,21 +1064,22 @@ export default function Recepciones() {
               <th className="text-left px-3 py-2.5">Artículo</th>
               <th className="text-left px-3 py-2.5">Requisitor</th>
               <th className="text-right px-3 py-2.5">Cant. PO</th>
+              <th className="text-right px-3 py-2.5">Total PO</th>
               <th className="text-right px-3 py-2.5">Recibido</th>
+              <th className="text-right px-3 py-2.5">Total recibido</th>
               <th className="text-right px-3 py-2.5">Pend.</th>
-              <th className="text-right px-3 py-2.5">Total</th>
               <th className="text-left px-3 py-2.5">Estatus</th>
               <th className="px-3 py-2.5"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-acero-100">
             {visibles.length === 0 && (
-              <tr><td colSpan="10" className="px-4 py-6 text-center text-acero-600">
+              <tr><td colSpan="11" className="px-4 py-6 text-center text-acero-600">
                 {soloPendientes ? 'Sin POs pendientes de recibir.' : 'Sin POs registradas.'}
               </td></tr>
             )}
             {visibles.map(p => (
-              <tr key={p.id_po} className="hover:bg-acero-50 cursor-pointer" onClick={() => { setDetalle(p); setHistorial(null) }}>
+              <tr key={p.id_po} className="hover:bg-acero-50 cursor-pointer" onClick={() => { setDetalle(p); setHistorial(null); cargarListasDoc(p) }}>
                 <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">{p.po}</td>
                 <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">
                   {fmtFecha(p.fecha_po)}
@@ -1058,9 +1089,10 @@ export default function Recepciones() {
                 </td>
                 <td className="px-3 py-2.5 text-xs">{p.requisitor ?? '—'}</td>
                 <td className="px-3 py-2.5 text-right font-mono">{p.cantidad_po}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-green-700">{p.total_recibido}</td>
-                <td className="px-3 py-2.5 text-right font-mono font-semibold">{p.pendiente}</td>
                 <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap">{money(p.total)}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-green-700">{p.total_recibido}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap text-green-700">{money((p.pu ?? 0) * p.total_recibido * 1.16)}</td>
+                <td className="px-3 py-2.5 text-right font-mono font-semibold">{p.pendiente}</td>
                 <td className="px-3 py-2.5">
                   <span className={`inline-block rounded border px-2 py-0.5 text-xs font-mono ${
                     p.estatus === 'Completo'

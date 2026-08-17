@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { parseCSV, normalizarHeader, parseMonto, parseFechaDMA } from '../lib/csv'
+import { parseCSV, normalizarHeader, parseMonto, parseFechaDMA, leerArchivoTexto } from '../lib/csv'
 
 export default function Salidas() {
   const { session, perfil } = useAuth()
@@ -78,9 +78,8 @@ export default function Salidas() {
     setError(''); setOk(''); setPreviewSal([]); setAvisosSal([])
     const archivo = e.target.files[0]
     if (!archivo) return
-    const lector = new FileReader()
-    lector.onload = () => {
-      const filas = parseCSV(lector.result)
+    leerArchivoTexto(archivo).then((texto) => {
+      const filas = parseCSV(texto)
       if (filas.length < 2) return setAvisosSal(['El archivo está vacío o solo tiene encabezados.'])
       const h = filas[0].map(normalizarHeader)
       const col = n => h.indexOf(n)
@@ -110,8 +109,7 @@ export default function Salidas() {
 
       setAvisosSal(avisos)
       setPreviewSal(regs)
-    }
-    lector.readAsText(archivo, 'utf-8')
+    })
     e.target.value = ''
   }
 

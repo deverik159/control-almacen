@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { leerArchivoTexto } from '../lib/csv'
 
 // Parser CSV sencillo con soporte de comillas
 function parseCSV(texto) {
@@ -36,9 +37,8 @@ export default function Importar() {
     setResultado(''); setErrores([]); setPreview([])
     const archivo = e.target.files[0]
     if (!archivo) return
-    const lector = new FileReader()
-    lector.onload = () => {
-      const filas = parseCSV(lector.result)
+    leerArchivoTexto(archivo).then((texto) => {
+      const filas = parseCSV(texto)
       if (filas.length < 2) return setErrores(['El archivo está vacío o solo tiene encabezados.'])
 
       const headers = filas[0].map(h => h.trim().toLowerCase())
@@ -73,8 +73,7 @@ export default function Importar() {
 
       setErrores(errs)
       setPreview(limpios)
-    }
-    lector.readAsText(archivo, 'utf-8')
+    })
     e.target.value = ''
   }
 

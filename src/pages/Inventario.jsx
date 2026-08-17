@@ -131,7 +131,7 @@ export default function Inventario() {
                 ? <img src={detalle.imagen} alt="" className="w-16 h-16 object-cover rounded border border-acero-200" />
                 : <div className="w-16 h-16 rounded border border-dashed border-acero-200 grid place-items-center text-acero-200 text-2xl">📦</div>}
               <div className="flex-1 min-w-0">
-                <div className="font-mono text-xs text-acero-600">{detalle.id_item}</div>
+                <div className="font-mono text-xs text-acero-600">ID: {detalle.id_item}</div>
                 <h2 className="font-semibold leading-snug">{detalle.nombre}</h2>
                 <StockBadge alerta={detalle.alerta_stock} />
               </div>
