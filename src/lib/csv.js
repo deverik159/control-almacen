@@ -42,3 +42,21 @@ export function parseFechaDMA(v) {
   const [, d, mes, a] = m
   return `${a}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
+
+// Lee un archivo detectando la codificación: intenta UTF-8 estricto y,
+// si falla (CSV de Excel en Windows-1252/Latin-1), decodifica como windows-1252.
+export function leerArchivoTexto(archivo) {
+  return new Promise((resolver, rechazar) => {
+    const lector = new FileReader()
+    lector.onload = () => {
+      const bytes = new Uint8Array(lector.result)
+      try {
+        resolver(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
+      } catch {
+        resolver(new TextDecoder('windows-1252').decode(bytes))
+      }
+    }
+    lector.onerror = () => rechazar(new Error('No se pudo leer el archivo'))
+    lector.readAsArrayBuffer(archivo)
+  })
+}
