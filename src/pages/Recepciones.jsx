@@ -945,7 +945,10 @@ export default function Recepciones() {
               ))}
             </dl>
             {detalle.observaciones && (
-              <p className="mt-3 text-sm text-acero-600 border-t border-acero-100 pt-2">{detalle.observaciones}</p>
+              <div className="mt-3 border-t border-acero-100 pt-2">
+                <dt className="text-xs text-acero-600">Observaciones</dt>
+                <dd className="text-sm">{detalle.observaciones}</dd>
+              </div>
             )}
 
             {/* Historial de recepciones */}
