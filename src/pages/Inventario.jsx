@@ -138,11 +138,12 @@ export default function Inventario() {
             </div>
 
             {/* Datos de solo lectura */}
-            <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+            <div className="grid grid-cols-4 gap-2 mb-4 text-center">
               {[
-                ['Stock actual', detalle.stock_calculado],
+                ['Inicial', detalle.stock_inicial],
                 ['Entradas', '+' + detalle.total_entradas],
                 ['Salidas', '−' + detalle.total_salidas],
+                ['Stock actual', detalle.stock_calculado],
               ].map(([k, v]) => (
                 <div key={k} className="bg-acero-50 rounded p-2.5">
                   <div className="text-[11px] text-acero-600">{k}</div>
