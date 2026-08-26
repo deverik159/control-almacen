@@ -109,6 +109,7 @@ export default function Recepciones() {
   const [editHist, setEditHist] = useState(null)     // recepción del historial en corrección
   // Importación
   const [previewPOs, setPreviewPOs] = useState([])
+  const [previewParciales, setPreviewParciales] = useState([])
   const [avisosImport, setAvisosImport] = useState([])
   const [importando, setImportando] = useState(false)
 
@@ -322,7 +323,7 @@ export default function Recepciones() {
         desc: col('descripcion'), um: col('um'), cant_po: col('cantidad_po'),
         cant_rec: col('cantidad_recepcion'), pu: col('pu'), estatus: col('estatus'),
         factura: col('factura_y_o_remision'), proveedor: col('proveedor'),
-        obs: col('observaciones'), ir: col('ir'),
+        obs: col('observaciones'), ir: col('ir'), origen: col('id_po_origen'),
       }
       if (idx.po < 0 || idx.id_item < 0 || idx.cant_po < 0)
         return setAvisosImport(['El CSV debe incluir al menos: PO, ID_Item y Cantidad PO. Encontré: ' + h.join(', ')])
@@ -360,13 +361,39 @@ export default function Recepciones() {
         return r
       }).filter(r => r.po && r.id_item && r.cantidad_po > 0)
 
+      // Filas con ID_PO_Origen: son recepciones parciales de OTRA PO (modelo AppSheet).
+      // Se cargan como recepciones de la PO original, NO como POs nuevas.
+      const conOrigen = filas.slice(1).map((f) => idx.origen >= 0 ? String(f[idx.origen] ?? '').trim() : '')
+      const parciales = []
+      const soloPOs = registros.filter((r, i) => {
+        const origen = conOrigen[i]
+        if (origen && origen !== r.id_po_legacy) {
+          if (r._recepcion > 0) parciales.push({
+            id_po_legacy: origen,
+            id_item: r.id_item,
+            cantidad: r._recepcion,
+            fecha: r.fecha_po,
+            po: r.po,
+            proveedor: r.proveedor,
+            area: r.area_asignada,
+            factura: r.factura_remision,
+            ir: r.ir,
+          })
+          return false
+        }
+        return true
+      })
+      if (parciales.length)
+        avisos.push(`${parciales.length} filas son recepciones parciales de otra PO (ID_PO_Origen): se cargarán como recepciones de la PO original, no como POs nuevas.`)
+
       // Duplicados por id_po_legacy dentro del archivo
       const vistos = new Set()
-      const limpios = registros.filter(r => {
+      const limpios = soloPOs.filter(r => {
         if (!r.id_po_legacy) return true
         if (vistos.has(r.id_po_legacy)) { avisos.push(`ID_PO duplicado en archivo: ${r.id_po_legacy} (se usa el primero).`); return false }
         vistos.add(r.id_po_legacy); return true
       })
+      setPreviewParciales(parciales)
 
       const faltantes = [...new Set(limpios.filter(r => !existeItem(r.id_item)).map(r => r.id_item))]
       if (faltantes.length)
@@ -420,19 +447,22 @@ export default function Recepciones() {
     if (err) { setImportando(false); return setError('Error al importar POs: ' + err.message) }
 
     // 3) Recepciones históricas → filas reales en entradas (historial visible)
-    const recepciones = previewPOs
-      .filter(r => r._recepcion > 0)
-      .map(r => ({
-        id_po_legacy: r.id_po_legacy,
-        id_item: r.id_item,
-        cantidad: r._recepcion,
-        fecha: r.fecha_po,
-        po: r.po,
-        proveedor: r.proveedor,
-        area: r.area_asignada,
-        factura: r.factura_remision,
-        ir: r.ir,
-      }))
+    const recepciones = [
+      ...previewPOs
+        .filter(r => r._recepcion > 0)
+        .map(r => ({
+          id_po_legacy: r.id_po_legacy,
+          id_item: r.id_item,
+          cantidad: r._recepcion,
+          fecha: r.fecha_po,
+          po: r.po,
+          proveedor: r.proveedor,
+          area: r.area_asignada,
+          factura: r.factura_remision,
+          ir: r.ir,
+        })),
+      ...previewParciales,
+    ]
     let creadas = 0
     if (recepciones.length) {
       const { data: n, error: e4 } = await supabase.rpc('importar_recepciones_historicas', { filas: recepciones })
@@ -441,8 +471,9 @@ export default function Recepciones() {
     }
     setImportando(false)
 
-    setOk(`✅ Importación completa: ${previewPOs.length} POs y ${creadas} recepciones históricas cargadas.`)
-    setPreviewPOs([]); setAvisosImport([]); setPanel(null)
+    setOk(`✅ Importación completa: ${previewPOs.length} POs y ${creadas} recepciones históricas cargadas.` +
+      (recepciones.length && creadas === 0 ? ' ⚠ Se esperaban ' + recepciones.length + ' recepciones y no se creó ninguna: revisa que los parches SQL v8/v9 estén ejecutados.' : ''))
+    setPreviewPOs([]); setPreviewParciales([]); setAvisosImport([]); setPanel(null)
     cargar()
   }
 
@@ -707,7 +738,10 @@ export default function Recepciones() {
           {previewPOs.length > 0 && (
             <>
               <div className="flex items-center justify-between mt-4 mb-2">
-                <h3 className="font-semibold text-sm">Vista previa — {previewPOs.length} POs</h3>
+                <h3 className="font-semibold text-sm">
+                  Vista previa — {previewPOs.length} POs
+                  {previewParciales.length > 0 && <span className="text-acero-600 font-normal"> + {previewParciales.length} recepciones parciales de esas POs</span>}
+                </h3>
                 <button onClick={importarPOs} disabled={importando}
                   className="rounded bg-ambar-500 text-acero-950 px-5 py-2 text-sm font-semibold hover:bg-ambar-400 disabled:opacity-50">
                   {importando ? 'Importando…' : 'Confirmar importación'}
