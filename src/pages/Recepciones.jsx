@@ -474,7 +474,7 @@ export default function Recepciones() {
     }
 
     // 2) Upsert de POs: si el id_po_legacy ya existe, se actualiza sin duplicar
-    const limpiarAux = ({ _recepcion, ...resto }) => resto
+    const limpiarAux = (r) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('_')))
     const conLegacy = previewPOs.filter(r => r.id_po_legacy).map(limpiarAux)
     const sinLegacy = previewPOs.filter(r => !r.id_po_legacy).map(limpiarAux)
     let err = null
