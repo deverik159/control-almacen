@@ -308,7 +308,7 @@ export default function Recepciones() {
 
   // ---- Importación de POs (CSV de AppSheet) ----
   const leerCSVPOs = (e) => {
-    limpiar(); setPreviewPOs([]); setAvisosImport([])
+    limpiar(); setPreviewPOs([]); setPreviewParciales([]); setAvisosImport([])
     const archivo = e.target.files[0]
     if (!archivo) return
     leerArchivoTexto(archivo).then((texto) => {
@@ -452,14 +452,16 @@ export default function Recepciones() {
     setImportando(true); limpiar()
 
     // 1) Alta de artículos faltantes (como Bot 5, stock 0)
-    const faltantes = [...new Set(previewPOs.filter(r => !existeItem(r.id_item)).map(r => r.id_item))]
+    //    Cubre POs Y recepciones parciales: un artículo puede venir solo en parciales.
+    const todosMov = [...previewPOs, ...previewParciales]
+    const faltantes = [...new Set(todosMov.filter(r => r.id_item && !existeItem(r.id_item)).map(r => r.id_item))]
     if (faltantes.length) {
       const nuevos = faltantes.map(id => {
-        const fila = previewPOs.find(r => r.id_item === id)
+        const fila = todosMov.find(r => r.id_item === id)
         const areaCod = areas.find(a =>
-          a.id_area === fila?.area_asignada ||
-          a.nombre_area?.toLowerCase() === String(fila?.area_asignada ?? '').toLowerCase()
-        )?.id_area ?? fila?.area_asignada ?? null
+          a.id_area === (fila?.area_asignada ?? fila?.area) ||
+          a.nombre_area?.toLowerCase() === String(fila?.area_asignada ?? fila?.area ?? '').toLowerCase()
+        )?.id_area ?? fila?.area_asignada ?? fila?.area ?? null
         return {
           id_item: id,
           nombre: fila?.articulo || ('Artículo ' + id),
@@ -505,7 +507,7 @@ export default function Recepciones() {
           ir: r.ir,
         })),
       ...previewParciales,
-    ]
+    ].filter(r => r.id_item)
     let creadas = 0
     if (recepciones.length) {
       const { data: n, error: e4 } = await supabase.rpc('importar_recepciones_historicas', { filas: recepciones })
