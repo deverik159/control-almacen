@@ -317,6 +317,7 @@ export default function Recepciones() {
 
       const h = filas[0].map(normalizarHeader)
       const col = (nombre) => h.indexOf(nombre)
+      const modoSinIdPo = col('id_po') < 0 && col('po') >= 0
       const idx = {
         legacy: col('id_po'), fecha: col('fecha_recepcion'), po: col('po'),
         area: col('area'), requisitor: col('requisitor'), id_item: col('id_item'),
@@ -334,7 +335,7 @@ export default function Recepciones() {
         const cantPO = parseMonto(v(f, idx.cant_po))
         const recibido = parseMonto(v(f, idx.cant_rec))
         const r = {
-          id_po_legacy: v(f, idx.legacy) || null,
+          id_po_legacy: (v(f, idx.legacy) || (modoSinIdPo ? (v(f, idx.po) + '::' + v(f, idx.item)) : '')) || null,
           po: v(f, idx.po),
           fecha_po: parseFechaDMA(v(f, idx.fecha)),
           id_item: v(f, idx.id_item),
@@ -360,6 +361,48 @@ export default function Recepciones() {
         if (recibido > cantPO) avisos.push(`Fila ${n + 2}: recibido (${recibido}) mayor a la PO (${cantPO}); se ajusta a ${cantPO}.`)
         return r
       }).filter(r => r.po && r.id_item && r.cantidad_po > 0)
+
+      // MODO SIN ID_PO (listado de recepciones): filas repetidas de PO+artículo
+      // son recepciones parciales de la MISMA PO → una sola PO, varias recepciones.
+      if (modoSinIdPo) {
+        const grupos = new Map()
+        registros.forEach(r => {
+          if (!grupos.has(r.id_po_legacy)) grupos.set(r.id_po_legacy, [])
+          grupos.get(r.id_po_legacy).push(r)
+        })
+        const posAgrupadas = []
+        const recepsSueltas = []
+        grupos.forEach(g => {
+          g.sort((a, b) => String(a.fecha_po).localeCompare(String(b.fecha_po)))
+          const base = { ...g[0] }
+          base.cantidad_po = Math.max(...g.map(x => Number(x.cantidad_po) || 0))
+          base.estatus = g[g.length - 1].estatus
+          base._recepcion = 0
+          base._rec_display = g.reduce((t, x) => t + (x._recepcion > 0 ? x._recepcion : 0), 0)
+          posAgrupadas.push(base)
+          g.forEach(x => {
+            if (x._recepcion > 0) recepsSueltas.push({
+              id_po_legacy: x.id_po_legacy,
+              id_item: x.id_item,
+              cantidad: x._recepcion,
+              fecha: x.fecha_po,
+              po: x.po,
+              proveedor: x.proveedor,
+              area: x.area_asignada,
+              factura: x.factura_remision,
+              ir: x.ir,
+            })
+          })
+          if (base._rec_display > base.cantidad_po)
+            avisos.push(`⚠ ${base.po} · ${base.id_item}: recepciones suman ${base._rec_display} y la PO es de ${base.cantidad_po}. Se importa tal cual — corrígela después desde el historial (✏).`)
+        })
+        const nDup = registros.length - posAgrupadas.length
+        if (nDup > 0) avisos.push(`${nDup} filas repetidas de PO+artículo se agruparon como recepciones parciales de su PO.`)
+        setPreviewParciales(recepsSueltas)
+        setPreviewPOs(posAgrupadas)
+        setAvisosImport(avisos)
+        return
+      }
 
       // Filas con ID_PO_Origen: son recepciones parciales de OTRA PO (modelo AppSheet).
       // Se cargan como recepciones de la PO original, NO como POs nuevas.
@@ -718,7 +761,7 @@ export default function Recepciones() {
         <div className="bg-white rounded-lg border border-acero-200 p-5 mb-6">
           <h2 className="font-semibold text-sm mb-2">Importar POs desde CSV (AppSheet)</h2>
           <p className="text-xs text-acero-600 mb-3 max-w-3xl">
-            Usa el CSV exportado de tu hoja de POs. Se leen: ID_PO, Fecha Recepción, PO, Área, Requisitor,
+            Acepta dos formatos: la hoja de POs de AppSheet (con ID_PO) o el listado mensual de recepciones (sin ID_PO — las POs se identifican por PO + artículo y las filas repetidas se agrupan como recepciones parciales). Se leen: ID_PO, Fecha Recepción, PO, Área, Requisitor,
             ID_Item, Descripción, UM, Cantidad PO, Cantidad Recepción, PU, Estatus, Factura y/o Remisión,
             Proveedor, Observaciones e IR. Los importes y faltantes se calculan solos. Lo ya recibido se importa como <b>recepciones reales con su fecha</b>: alimenta el historial 📜,
             la bitácora y el stock (stock = inicial + entradas − salidas, así que el stock_inicial del
@@ -767,7 +810,7 @@ export default function Recepciones() {
                         <td className="px-3 py-1.5 font-mono">{r.fecha_po ?? '—'}</td>
                         <td className="px-3 py-1.5"><span className="font-mono text-acero-600">{r.id_item}</span> {r.articulo}</td>
                         <td className="px-3 py-1.5 text-right font-mono">{r.cantidad_po}</td>
-                        <td className="px-3 py-1.5 text-right font-mono">{r._recepcion}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{r._rec_display ?? r._recepcion}</td>
                         <td className="px-3 py-1.5 text-right font-mono">{money(r.pu)}</td>
                         <td className="px-3 py-1.5">{r.estatus}</td>
                       </tr>
