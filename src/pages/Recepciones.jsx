@@ -335,7 +335,7 @@ export default function Recepciones() {
         const cantPO = parseMonto(v(f, idx.cant_po))
         const recibido = parseMonto(v(f, idx.cant_rec))
         const r = {
-          id_po_legacy: (v(f, idx.legacy) || (modoSinIdPo ? (v(f, idx.po) + '::' + v(f, idx.item)) : '')) || null,
+          id_po_legacy: (v(f, idx.legacy) || (modoSinIdPo ? (v(f, idx.po) + '::' + v(f, idx.id_item)) : '')) || null,
           po: v(f, idx.po),
           fecha_po: parseFechaDMA(v(f, idx.fecha)),
           id_item: v(f, idx.id_item),
