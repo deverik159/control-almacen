@@ -57,6 +57,7 @@ export default function Inventario() {
     setDetalle(i)
     setMsgEd('')
     setFormEd({
+      id_item: i.id_item ?? '',
       nombre: i.nombre ?? '',
       unidad_medida: i.unidad_medida ?? '',
       stock_minimo: i.stock_minimo ?? 1,
@@ -66,16 +67,22 @@ export default function Inventario() {
 
   const guardarEdicion = async () => {
     setMsgEd('')
+    if (!formEd.id_item.trim()) return setMsgEd('⚠ El ID no puede quedar vacío.')
     if (!formEd.nombre.trim()) return setMsgEd('⚠ El nombre no puede quedar vacío.')
     setGuardandoEd(true)
     const { error } = await supabase.from('materiales_herramientas').update({
+      id_item: formEd.id_item.trim(),
       nombre: formEd.nombre.trim(),
       unidad_medida: formEd.unidad_medida || null,
       stock_minimo: Number(formEd.stock_minimo) || 0,
       id_area: formEd.id_area || null,
     }).eq('id_inventario', detalle.id_inventario)
     setGuardandoEd(false)
-    if (error) return setMsgEd('❌ ' + error.message)
+    if (error) return setMsgEd(error.code === '23505'
+      ? '❌ El ID "' + formEd.id_item.trim() + '" ya existe en otro artículo.'
+      : '❌ ' + error.message)
+    if (formEd.id_item.trim() !== detalle.id_item)
+      setDetalle(d => ({ ...d, id_item: formEd.id_item.trim() }))
     setMsgEd('✅ Cambios guardados y registrados en bitácora.')
     cargar()
   }
@@ -160,7 +167,16 @@ export default function Inventario() {
 
             {/* Campos editables */}
             <div className="grid sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
+              <div>
+                <label className="block text-xs font-medium text-acero-600 mb-1">ID (código)</label>
+                <input value={formEd.id_item} disabled={!puedeEditar}
+                  onChange={e => setFormEd(v => ({ ...v, id_item: e.target.value }))}
+                  className="w-full rounded border border-acero-200 px-3 py-2 text-sm font-mono disabled:bg-acero-50" />
+                {puedeEditar && formEd.id_item.trim() !== detalle.id_item && (
+                  <p className="text-[11px] text-yellow-800 mt-1">⚠ Al cambiar el ID, todo su historial (entradas, salidas, POs, devoluciones) lo sigue automáticamente.</p>
+                )}
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-acero-600 mb-1">Nombre</label>
                 <input value={formEd.nombre} disabled={!puedeEditar}
                   onChange={e => setFormEd(v => ({ ...v, nombre: e.target.value }))}

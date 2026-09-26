@@ -103,6 +103,16 @@ export default function Salidas() {
         return r
       }).filter(r => r.id_item && r.cantidad > 0)
 
+      // Suma por artículo vs stock disponible: avisar ANTES de importar
+      const porItem = {}
+      regs.forEach(r => { porItem[r.id_item] = (porItem[r.id_item] ?? 0) + r.cantidad })
+      const mapaStock = Object.fromEntries(stock.map(i => [i.id_item, i]))
+      Object.entries(porItem).forEach(([id, total]) => {
+        const it = mapaStock[id]
+        if (it && total > it.stock_calculado)
+          avisos.push(`⚠ ${id} · ${it.nombre}: el archivo saca ${total} y el stock disponible es ${it.stock_calculado}. La importación completa se rechazará — corrige el archivo o carga antes sus recepciones.`)
+      })
+
       const desconocidos = [...new Set(regs.filter(r => !idsStock.has(r.id_item)).map(r => r.id_item))]
       if (desconocidos.length)
         avisos.push(`Ojo: ${desconocidos.length} códigos no aparecen con stock actual (${desconocidos.slice(0, 8).join(', ')}${desconocidos.length > 8 ? '…' : ''}). Si no existen en el maestro o exceden el stock, la importación se rechazará completa.`)
